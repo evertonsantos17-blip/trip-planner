@@ -929,7 +929,7 @@ box-shadow:0 0 0 .5px rgba(255,255,255,.25);
 
 <!-- Generating -->
 
-<div class="generating-screen" id="generating"><div class="gen-spinner"></div><div class="gen-title">Criando seu roteiro</div><div class="gen-sub" id="gen-dest-text"></div><div class="gen-steps"><div class="gen-step" id="gen-s0"><div class="gen-step-dot"></div> 🔍 Buscando lugares reais online'></div><div class="gen-step" id="gen-s1"><div class="gen-step-dot"></div> ☕ Selecionando cafés e restaurantes'></div><div class="gen-step" id="gen-s2"><div class="gen-step-dot"></div> 🏛️ Montando atrações por bairro'></div><div class="gen-step" id="gen-s3"><div class="gen-step-dot"></div> 🌅 Planejando pôr do sol e noite'></div><div class="gen-step" id="gen-s4"><div class="gen-step-dot"></div> ✨ Finalizando roteiro dia a dia</div></div></div>
+<div class="generating-screen" id="generating"><div class="gen-spinner"></div><div class="gen-title">Criando seu roteiro</div><div class="gen-sub" id="gen-dest-text"></div><div class="gen-steps"><div class="gen-step" id="gen-s0"><div class="gen-step-dot"></div> 🔍 Pesquisando destino e hotel'></div><div class="gen-step" id="gen-s1"><div class="gen-step-dot"></div> 📅 Gerando dias do roteiro'></div><div class="gen-step" id="gen-s2"><div class="gen-step-dot"></div> 🍽️ Buscando restaurantes únicos'></div><div class="gen-step" id="gen-s3"><div class="gen-step-dot"></div> 🌅 Adicionando atrações e pôr do sol'></div><div class="gen-step" id="gen-s4"><div class="gen-step-dot"></div> ✨ Finalizando roteiro dia a dia</div></div></div>
 
 <!-- Trips Screen -->
 
@@ -1781,131 +1781,278 @@ mapStops: [{ name: city, lat: -22.9, lng: -43.2 }]
 }
 
 /* ══════════ GENERATE TRIP ══════════ */
+
+/* Helper: extract text from Anthropic API response content blocks */
+function extractText(content) {
+return (content || []).filter(function(c) { return c.type === ‘text’; })
+.map(function(c) { return c.text || ‘’; }).join(’’);
+}
+
+/* Helper: parse JSON from AI response */
+function parseAIJson(raw) {
+var clean = raw.replace(/`json\s*|\s*`/g, ‘’).trim();
+var m = clean.match(/{[\s\S]*}/);
+if (m) clean = m[0];
+try { return JSON.parse(clean); } catch(e) {
+try { return JSON.parse(repairJSON(clean)); } catch(e2) { return null; }
+}
+}
+
+/* Helper: update the progress label on the generating screen */
+function setGenStatus(text) {
+var el = document.getElementById(‘gen-dest-text’);
+if (el) el.textContent = text;
+}
+function setGenStep(idx) {
+[‘gen-s0’,‘gen-s1’,‘gen-s2’,‘gen-s3’,‘gen-s4’].forEach(function(id, i) {
+var el = document.getElementById(id);
+if (!el) return;
+el.className = ‘gen-step’ + (i < idx ? ’ done’ : i === idx ? ’ active’ : ‘’);
+});
+}
+
+/* Call Anthropic API with web search, return parsed JSON or null */
+async function callAI(prompt) {
+var response = await fetch(“https://api.anthropic.com/v1/messages”, {
+method: “POST”,
+headers: { “Content-Type”: “application/json”, “anthropic-version”: “2023-06-01” },
+body: JSON.stringify({
+model: “claude-sonnet-4-20250514”,
+max_tokens: 4000,
+tools: [{ “type”: “web_search_20250305”, “name”: “web_search” }],
+messages: [{ role: “user”, content: prompt }]
+})
+});
+if (!response.ok) return null;
+var data = await response.json();
+return parseAIJson(extractText(data.content));
+}
+
+/* Fix event types based on time slot */
+function fixEventTypes(events) {
+return (events || []).map(function(ev) {
+var h = parseInt((ev.time || ‘0’).split(’:’)[0]);
+var e = Object.assign({}, ev);
+if (h >= 7  && h <= 9  && e.type === ‘food’) e.type = ‘cafe’;
+if (h >= 11 && h <= 14 && e.type === ‘cafe’) e.type = ‘food’;
+if (h >= 18 && h <= 20 && e.type === ‘cafe’) e.type = ‘food’;
+if (h >= 21 && e.type === ‘food’) e.type = ‘bar’;
+return e;
+});
+}
+
 async function generateTrip() {
-var dest = document.getElementById(‘wiz-destination’).value.trim();
+var dest      = document.getElementById(‘wiz-destination’).value.trim();
 var dateStart = document.getElementById(‘wiz-date-start’).value;
-var dateEnd = document.getElementById(‘wiz-date-end’).value;
-var styles = [].slice.call(document.querySelectorAll(’#wiz-style-chips .wiz-chip.selected’)).map(function(c) { return c.dataset.style; });
-var notes = document.getElementById(‘wiz-notes’).value.trim();
+var dateEnd   = document.getElementById(‘wiz-date-end’).value;
+var styles    = [].slice.call(document.querySelectorAll(’#wiz-style-chips .wiz-chip.selected’))
+.map(function(c) { return c.dataset.style; });
+var notes     = document.getElementById(‘wiz-notes’).value.trim();
 if (!dest || !dateStart || !dateEnd) { alert(‘Preencha destino e datas.’); return; }
+
 var d1 = new Date(dateStart + ‘T00:00:00’), d2 = new Date(dateEnd + ‘T00:00:00’);
 var numDays = Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
-hideAll(); var gen = document.getElementById(‘generating’); gen.classList.add(‘active’);
-document.getElementById(‘gen-dest-text’).textContent = dest + ’ · ’ + numDays + ’ dias’;
-var stepIds = [‘gen-s0’,‘gen-s1’,‘gen-s2’,‘gen-s3’,‘gen-s4’]; var si = 0;
-var interval = setInterval(function() { if (si > 0) document.getElementById(stepIds[si-1]).className = ‘gen-step done’; if (si < stepIds.length) { document.getElementById(stepIds[si]).className = ‘gen-step active’; si++; } else clearInterval(interval); }, 800);
-/* Try API, fallback to mock */
+
+hideAll();
+var gen = document.getElementById(‘generating’);
+gen.classList.add(‘active’);
+setGenStatus(dest + ’ · ’ + numDays + ’ dias’);
+setGenStep(0);
+
 var budgetInfo = ‘’;
-if (budgetEnabled) { var ba = document.getElementById(‘wiz-budget-amount’).value, bc = document.getElementById(‘wiz-budget-currency’).value; if (ba) budgetInfo = ’ Orçamento TOTAL: ’ + bc + ’ ’ + ba + ‘. O custo total de TODAS atividades+hotéis DEVE ficar dentro deste valor.’; }
-var trip = null;
-try {
-/* Build list of example days to force variety in the prompt */
-var exampleStructure = ‘’;
-for (var _d = 0; _d < Math.min(numDays, 3); _d++) {
-exampleStructure += ‘\nDIA ’ + (_d+1) + ’ — todos os 8 lugares DIFERENTES dos outros dias:’;
-exampleStructure += ‘\n  08:00 cafe | 10:00 sight | 12:30 food | 14:30 sight | 16:30 cafe | 17:30 sight(sunset) | 19:30 food | 21:00 bar’;
+if (budgetEnabled) {
+var ba = document.getElementById(‘wiz-budget-amount’).value;
+var bc = document.getElementById(‘wiz-budget-currency’).value;
+if (ba) budgetInfo = ’Orçamento total: ’ + bc + ’ ’ + ba + ‘.’;
 }
 
-```
-var prompt = `Você é um especialista em viagens com acesso à internet. Pesquise lugares REAIS em ${dest} e crie um roteiro detalhado de ${dateStart} a ${dateEnd} (${numDays} dias).
-```
+var trip = null;
+var apiOk = false;
 
-PERFIL: ${travelers} viajante(s) | Estilos: ${styles.length ? styles.join(’, ’) : ‘variado’}${notes ? ’ | Obs: ’ + notes : ‘’}${budgetInfo}
-
-════ ESTRUTURA OBRIGATÓRIA DE CADA DIA (8 momentos fixos) ════
-Momento 1 → 08:00 | type:“cafe”  | Café da manhã: padaria, café ou mercado local REAL
-Momento 2 → 10:00 | type:“sight” | Atração manhã: museu, monumento, bairro histórico
-Momento 3 → 12:30 | type:“food”  | Almoço: restaurante típico local REAL
-Momento 4 → 14:30 | type:“sight” | Atração tarde: diferente da manhã (galeria, mercado, parque)
-Momento 5 → 16:30 | type:“cafe”  | Café da tarde: sorveteria, doceria, confeitaria, café especial
-Momento 6 → 17:30 | type:“sight” | Pôr do sol: mirante, praça elevada, orla, jardim com vista
-Momento 7 → 19:30 | type:“food”  | Jantar: restaurante real (diferente do almoço)
-Momento 8 → 21:00 | type:“bar”   | Noturno: bar, praça animada, barzinho, show ao vivo
-
-════ REGRAS ANTI-REPETIÇÃO (CRÍTICO) ════
-
-- Faça uma lista mental de TODOS os lugares usados em CADA dia
-- NUNCA repita o mesmo café, restaurante ou atração em dias diferentes
-- Cada dia deve ter 8 lugares ÚNICOS que não aparecem em nenhum outro dia
-- Se ${dest} tiver poucos lugares conhecidos, use bairros/áreas diferentes ou cidades vizinhas
-- Tipo “cafe” APENAS para café da manhã (momento 1) e café da tarde (momento 5) — NUNCA para almoço ou jantar
-- Tipo “food” APENAS para almoço (momento 3) e jantar (momento 7)
-- Títulos dos dias: criativos e diferentes entre si
-
-════ QUALIDADE ════
-
-- Use web search para confirmar lugares reais em ${dest}
-- Inclua “location” com endereço ou bairro real de cada lugar
-- Roteiro geograficamente inteligente: agrupe atrações próximas
-
-Responda APENAS JSON válido (sem markdown, sem texto antes ou depois):
-{“tripName”:“string”,“country”:“string”,“flag”:“🇧🇷”,“color”:”#C4622D”,“totalCost”:0,“budgetCurrency”:“BRL”,“cities”:[{“name”:“string”,“color”:”#C4622D”,“hotel”:{“name”:“string”,“area”:“string”,“nights”:${numDays},“link”:“https://www.booking.com/searchresults.html?ss=${encodeURIComponent(dest)}”,“cost”:0},“days”:[{“date”:“YYYY-MM-DD”,“title”:“Título criativo único”,“events”:[{“time”:“08:00”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“cafe”,“cost”:0,“location”:“endereço”},{“time”:“10:00”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“sight”,“cost”:0,“location”:“endereço”},{“time”:“12:30”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“food”,“cost”:0,“location”:“endereço”},{“time”:“14:30”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“sight”,“cost”:0,“location”:“endereço”},{“time”:“16:30”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“cafe”,“cost”:0,“location”:“endereço”},{“time”:“17:30”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“sight”,“cost”:0,“location”:“endereço”},{“time”:“19:30”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“food”,“cost”:0,“location”:“endereço”},{“time”:“21:00”,“title”:“Nome Real”,“desc”:“descrição”,“type”:“bar”,“cost”:0,“location”:“endereço”}]}]}],“checklist”:[“📄 Documentos”,“✈️ Passagens”,“🏨 Hotel”],“mapStops”:[{“name”:“string”,“lat”:0,“lng”:0}]}`;
+try {
+/* ── STEP 1: Generate trip skeleton (name, hotel, checklist) ── */
+setGenStep(0);
+setGenStatus(’🔍 Pesquisando ’ + dest + ‘…’);
 
 ```
-var response = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" },
-  body: JSON.stringify({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 16000,
-    tools: [{ "type": "web_search_20250305", "name": "web_search" }],
-    messages: [{ role: "user", content: prompt }]
-  })
-});
-if (response.ok) {
-  var data = await response.json();
-  if (data.content && data.content.length) {
-    var text = data.content.filter(function(c) { return c.type === 'text'; }).map(function(c) { return c.text || ''; }).join('');
-    var clean = text.replace(/```json\s*|\s*```/g, '').trim();
-    var jsonMatch = clean.match(/\{[\s\S]*\}/);
-    if (jsonMatch) clean = jsonMatch[0];
-    try { trip = JSON.parse(clean); } catch(e) { try { trip = JSON.parse(repairJSON(clean)); } catch(e2) { console.log('JSON parse error:', e2); } }
-    if (trip && (!trip.cities || !trip.cities.length)) trip = null;
-    /* Post-process: enforce correct types based on time slot */
-    if (trip) {
-      trip.cities.forEach(function(city) {
-        city.days.forEach(function(day) {
-          (day.events || []).forEach(function(ev) {
-            var h = parseInt((ev.time||'0').split(':')[0]);
-            /* Morning slot (7-10h): must be cafe */
-            if (h >= 7 && h <= 9 && ev.type === 'food') ev.type = 'cafe';
-            /* Lunch slot (11-14h): must be food */
-            if (h >= 11 && h <= 14 && ev.type === 'cafe') ev.type = 'food';
-            /* Afternoon cafe (15-17h): keep as cafe */
-            /* Dinner slot (18-21h): must be food unless bar */
-            if (h >= 18 && h <= 21 && ev.type === 'cafe') ev.type = 'food';
-            /* Late night (21h+): prefer bar */
-            if (h >= 21 && ev.type === 'food') ev.type = 'bar';
-          });
-        });
-      });
-    }
+var skeletonPrompt = `Pesquise informações reais sobre ${dest} para uma viagem de ${numDays} dias (${dateStart} a ${dateEnd}).
+```
+
+Responda APENAS JSON (sem markdown):
+{“tripName”:“string”,“country”:“string”,“flag”:“emoji bandeira”,“color”:“hex cor vibrante”,“budgetCurrency”:“BRL”,“totalCost”:0,
+“hotel”:{“name”:“nome real do hotel em ${dest}”,“area”:“bairro”,“nights”:${numDays},“link”:“https://www.booking.com/searchresults.html?ss=${encodeURIComponent(dest)}”,“cost”:0},
+“checklist”:[“📄 Documentos”,“✈️ Passagens”,“🏨 Hotel”],
+“mapLat”:0.0,“mapLng”:0.0}`;
+
+```
+var skeleton = await callAI(skeletonPrompt);
+if (!skeleton) throw new Error('skeleton failed');
+apiOk = true;
+
+/* ── STEP 2: Generate days one by one ── */
+var allDays = [];
+var usedPlaces = []; /* accumulates titles of all places used so far */
+
+var dayTitleOptions = [
+  'Chegada e Primeiros Passos',
+  'Explorando o Centro Histórico',
+  'Cultura e Gastronomia',
+  'Bairros e Vida Local',
+  'Arte, Mercados e Sabores',
+  'Natureza e Mirantes',
+  'Imersão Cultural',
+  'Dia de Aventuras',
+  'Gastronomia e Passeios',
+  'Encantos Escondidos',
+  'Ritmo Local',
+  'Última Manhã — Despedida'
+];
+
+for (var dayIdx = 0; dayIdx < numDays; dayIdx++) {
+  var stepNum = Math.min(1 + Math.floor(dayIdx / Math.max(1, numDays) * 3), 3);
+  setGenStep(stepNum);
+  setGenStatus('📅 Gerando dia ' + (dayIdx + 1) + ' de ' + numDays + '...');
+
+  var dayDate = new Date(d1);
+  dayDate.setDate(d1.getDate() + dayIdx);
+  var dateStr = dayDate.toISOString().split('T')[0];
+
+  var isFirst = dayIdx === 0;
+  var isLast  = dayIdx === numDays - 1 && numDays > 1;
+  var dayTitle = isFirst ? 'Chegada em ' + dest.split(',')[0]
+               : isLast  ? 'Último Dia — Despedida'
+               : dayTitleOptions[dayIdx % dayTitleOptions.length] + ' em ' + dest.split(',')[0];
+
+  var usedBlock = usedPlaces.length > 0
+    ? '\n\nLUGARES JÁ USADOS NOS DIAS ANTERIORES (PROIBIDO repetir qualquer um destes):\n' + usedPlaces.map(function(p,i){ return (i+1)+'. '+p; }).join('\n')
+    : '';
+
+  var dayPrompt = `Você é um especialista em viagens. Crie o DIA ${dayIdx+1} de ${numDays} do roteiro de ${dest}.
+```
+
+Data: ${dateStr} | Viajantes: ${travelers} | Estilos: ${styles.length ? styles.join(’, ’) : ‘variado’}${notes ? ’ | Obs: ’+notes : ‘’}${budgetInfo ? ’ | ’+budgetInfo : ‘’}
+${usedBlock}
+
+ESTRUTURA OBRIGATÓRIA — exatamente 8 eventos nesta ordem:
+
+1. 08:00 | type:“cafe”  | Café da manhã: padaria, café ou mercado REAL
+1. 10:00 | type:“sight” | Atração manhã: museu, monumento, bairro histórico REAL
+1. 12:30 | type:“food”  | Almoço: restaurante típico REAL (nome do estabelecimento)
+1. 14:30 | type:“sight” | Atração tarde: DIFERENTE da manhã (galeria, parque, mercado)
+1. 16:30 | type:“cafe”  | Café da tarde: sorveteria, doceria, café especial REAL
+1. 17:30 | type:“sight” | Pôr do sol: mirante, orla, praça elevada, jardim com vista
+1. 19:30 | type:“food”  | Jantar: restaurante REAL diferente do almoço
+1. 21:00 | type:“bar”   | Noturno: bar, praça animada, barzinho, show ao vivo
+
+REGRAS:
+
+- Use web search para confirmar lugares REAIS e que existem em ${dest}
+- Todos os 8 lugares devem ser DIFERENTES entre si e diferentes de TODOS os dias anteriores
+- Se ${dest} for pequena, explore arredores e cidades vizinhas
+- “location”: endereço ou bairro real
+- “cost”: valor estimado em BRL (0 se gratuito)
+- “desc”: dica prática de 1 linha sobre o lugar
+
+Responda APENAS JSON (sem markdown, sem texto extra):
+{“date”:”${dateStr}”,“title”:”${dayTitle}”,“events”:[
+{“time”:“08:00”,“title”:“Nome Real”,“desc”:“dica”,“type”:“cafe”,“cost”:0,“location”:“endereço”},
+{“time”:“10:00”,“title”:“Nome Real”,“desc”:“dica”,“type”:“sight”,“cost”:0,“location”:“endereço”},
+{“time”:“12:30”,“title”:“Nome Real”,“desc”:“dica”,“type”:“food”,“cost”:0,“location”:“endereço”},
+{“time”:“14:30”,“title”:“Nome Real”,“desc”:“dica”,“type”:“sight”,“cost”:0,“location”:“endereço”},
+{“time”:“16:30”,“title”:“Nome Real”,“desc”:“dica”,“type”:“cafe”,“cost”:0,“location”:“endereço”},
+{“time”:“17:30”,“title”:“Nome Real”,“desc”:“dica”,“type”:“sight”,“cost”:0,“location”:“endereço”},
+{“time”:“19:30”,“title”:“Nome Real”,“desc”:“dica”,“type”:“food”,“cost”:0,“location”:“endereço”},
+{“time”:“21:00”,“title”:“Nome Real”,“desc”:“dica”,“type”:“bar”,“cost”:0,“location”:“endereço”}
+]}`;
+
+```
+  var dayResult = await callAI(dayPrompt);
+
+  if (dayResult && dayResult.events && dayResult.events.length) {
+    dayResult.events = fixEventTypes(dayResult.events);
+    /* Register all places used this day */
+    dayResult.events.forEach(function(ev) {
+      if (ev.title) usedPlaces.push(ev.title);
+    });
+    allDays.push(dayResult);
+  } else {
+    /* Fallback: use mock for this day */
+    var mockDay = generateMockTripData(dest, dateStr, dateStr, 1, styles);
+    var fd = mockDay.cities[0].days[0];
+    fd.date = dateStr;
+    fd.title = dayTitle;
+    allDays.push(fd);
+    fd.events.forEach(function(ev) { if (ev.title) usedPlaces.push(ev.title); });
   }
 }
+
+/* ── STEP 3: Assemble full trip ── */
+setGenStep(4);
+setGenStatus('✨ Finalizando roteiro...');
+
+var totalCost = allDays.reduce(function(s, d) {
+  return s + (d.events || []).reduce(function(a, e) { return a + (e.cost || 0); }, 0);
+}, 0) + (skeleton.hotel.cost || 0);
+
+trip = {
+  tripName:       skeleton.tripName || dest,
+  country:        skeleton.country  || dest,
+  flag:           skeleton.flag     || getCountryFlag(dest),
+  color:          skeleton.color    || '#C4622D',
+  totalCost:      totalCost,
+  budgetCurrency: 'BRL',
+  cities: [{
+    name:  dest.split(',')[0].trim(),
+    color: skeleton.color || '#C4622D',
+    hotel: skeleton.hotel,
+    days:  allDays
+  }],
+  checklist:  skeleton.checklist || ['📄 Documentos','✈️ Passagens','🏨 Hotel'],
+  mapStops: [{ name: dest.split(',')[0].trim(), lat: skeleton.mapLat || 0, lng: skeleton.mapLng || 0 }]
+};
 ```
 
-} catch(e) { console.log(‘API offline, usando mock:’, e.message); }
+} catch(e) {
+console.log(‘API error, usando mock:’, e.message);
+}
+
 if (!trip) trip = generateMockTripData(dest, dateStart, dateEnd, numDays, styles);
-clearInterval(interval); stepIds.forEach(function(id) { document.getElementById(id).className = ‘gen-step done’; });
+
+setGenStep(4);
+[‘gen-s0’,‘gen-s1’,‘gen-s2’,‘gen-s3’,‘gen-s4’].forEach(function(id) {
+var el = document.getElementById(id);
+if (el) el.className = ‘gen-step done’;
+});
+
 if (!trip.flag) trip.flag = getCountryFlag(dest);
 if (!trip.tripName) trip.tripName = dest;
-trip.*styles = styles;
-var tripId = editingTripId || (’trip*’ + Date.now());
+trip._styles = styles;
+
+var tripId = editingTripId || (‘trip_’ + Date.now());
 await PS.save(tripKey(tripId, ‘data’), trip);
 await PS.save(tripKey(tripId, ‘checks’), {});
 await PS.save(tripKey(tripId, ‘deleted’), []);
-await PS.save(tripKey(tripId, ‘checklist’), (trip.checklist || []).map(function(t, i) { return { id: ‘cl_’ + i, text: t, packed: false }; }));
+await PS.save(tripKey(tripId, ‘checklist’), (trip.checklist || []).map(function(t, i) {
+return { id: ‘cl_’ + i, text: t, packed: false };
+}));
+
 var idx = await loadTripIndex();
-var allD = trip.cities.reduce(function(a, c) { return a.concat(c.days.map(function(d) { return d.date; })); }, []).sort();
-var entry = { id: tripId, name: trip.tripName, flag: trip.flag, color: trip.color || ‘#C4622D’, dateStart: allD[0] || dateStart, dateEnd: allD[allD.length - 1] || dateEnd, created: Date.now() };
-var existIdx = -1; for (var i = 0; i < idx.length; i++) { if (idx[i].id === tripId) { existIdx = i; break; } }
+var allD = trip.cities.reduce(function(a, c) {
+return a.concat(c.days.map(function(d) { return d.date; }));
+}, []).sort();
+var entry = {
+id: tripId, name: trip.tripName, flag: trip.flag, color: trip.color || ‘#C4622D’,
+dateStart: allD[0] || dateStart, dateEnd: allD[allD.length-1] || dateEnd, created: Date.now()
+};
+var existIdx = -1;
+for (var i = 0; i < idx.length; i++) { if (idx[i].id === tripId) { existIdx = i; break; } }
 if (existIdx !== -1) idx[existIdx] = entry; else idx.unshift(entry);
 await saveTripIndex(idx);
+
 activeTripId = tripId; editingTripId = null;
 baseCurrency = trip.budgetCurrency || ‘BRL’; displayCurrency = baseCurrency;
-setTimeout(function() { gen.classList.remove(‘active’); renderApp(trip); }, 500);
+setTimeout(function() { gen.classList.remove(‘active’); renderApp(trip); }, 400);
 }
-
 function repairJSON(str) { str = str.replace(/,\s*$/, ‘’); var ob = 0, oq = 0, inS = false, esc = false; for (var i = 0; i < str.length; i++) { var c = str[i]; if (esc) { esc = false; continue; } if (c === ‘\’) { esc = true; continue; } if (c === ‘”’) { inS = !inS; continue; } if (inS) continue; if (c === ‘{’) ob++; if (c === ‘}’) ob–; if (c === ‘[’) oq++; if (c === ‘]’) oq–; } if (inS) str += ‘”’; str = str.replace(/,\s*”[^”]*”?\s*:?\s*”?[^”]*$/, ‘’).replace(/,\s*$/, ‘’); for (var i = 0; i < oq; i++) str += ‘]’; for (var i = 0; i < ob; i++) str += ‘}’; return str; }
 
 /* ══════════ RESTYLE ══════════ */
