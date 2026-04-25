@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Trip Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<style>
+:root{--ink:#1A1714;--ink-soft:#2C2824;--ink-muted:#8A8480;--sand:#F5F1EB;--sand-dark:#E8E2D8;--cream:#FDFCFA;--gold:#C49B5C;--gold-light:#F5EDE0;--terra:#C4622D;--terra-light:#FDF0E9;--green:#1D9E75;--green-light:#E8F7F1;--blue:#2D6BC4;--blue-light:#E9F0FC;--rose:#B44D6E;--radius:14px;--shadow-sm:0 1px 3px rgba(0,0,0,0.06);--shadow-md:0 4px 16px rgba(0,0,0,0.08)}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--sand);color:var(--ink);min-height:100dvh;overflow-x:hidden}
+
+/* LOGIN */
+.login-screen{position:fixed;inset:0;z-index:99999;background:var(--ink);display:flex;align-items:center;justify-content:center;transition:opacity .5s,transform .5s}
+.login-screen.dismissed{opacity:0;transform:scale(1.05);pointer-events:none}.login-screen.hidden{display:none}
+.login-bg{position:absolute;inset:0;opacity:.03;background:repeating-linear-gradient(45deg,transparent,transparent 40px,rgba(255,255,255,.05) 40px,rgba(255,255,255,.05) 41px);pointer-events:none}
+.login-card{position:relative;z-index:1;width:100%;max-width:340px;padding:0 1.5rem;display:flex;flex-direction:column;align-items:center}
+.login-icon{width:68px;height:68px;border-radius:20px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:1.5rem}
+.login-eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:6px}
+.login-heading{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:500;color:#fff;text-align:center;margin-bottom:4px}
+.login-sub{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:1.75rem;text-align:center}
+.login-field{width:100%;position:relative;margin-bottom:10px}
+.login-input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.login-input::placeholder{color:rgba(255,255,255,.25)}.login-input:focus{border-color:var(--gold)}
+.login-input.shake{border-color:#C4622D;animation:shake .4s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+.login-pw-toggle{position:absolute;right:4px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,.3);font-size:18px;padding:10px 12px;cursor:pointer}
+.login-error{font-size:12px;color:#E8694A;text-align:center;min-height:20px;margin-bottom:6px}
+.login-primary-btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:var(--ink);font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:transform .1s;margin-bottom:12px}
+.login-primary-btn:active{transform:scale(.98)}.login-primary-btn:disabled{opacity:.4}
+.login-switch{margin-top:1.5rem;font-size:13px;color:rgba(255,255,255,.4);text-align:center}
+.login-switch a{color:var(--gold);text-decoration:none;font-weight:500;cursor:pointer}
+.logout-btn{position:fixed;top:12px;right:12px;z-index:1001;background:var(--cream);border:1px solid var(--sand-dark);border-radius:20px;padding:6px 12px;font-size:11px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--ink-muted);cursor:pointer;display:none;align-items:center;gap:4px}
+.logout-btn.visible{display:flex}
+body.locked .wizard-container,body.locked .app-container,body.locked .trips-screen,body.locked .logout-btn{visibility:hidden}
+
+/* WIZARD */
+.wizard-container{min-height:100dvh;display:flex;flex-direction:column}.wizard-container.hidden{display:none}
+.wizard-progress{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 20px 12px;background:rgba(245,241,235,.92);backdrop-filter:blur(12px)}
+.wizard-steps{display:flex;gap:6px}
+.wizard-step-dot{flex:1;height:3px;border-radius:3px;background:var(--sand-dark);transition:background .4s}
+.wizard-step-dot.active{background:var(--gold)}.wizard-step-dot.done{background:var(--ink)}
+.wizard-page{flex:1;display:none;flex-direction:column;padding:80px 24px 120px;animation:wizIn .4s ease}
+.wizard-page.active{display:flex}
+@keyframes wizIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.wiz-eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:8px}
+.wiz-title{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:500;line-height:1.15;margin-bottom:6px}
+.wiz-subtitle{font-size:14px;color:var(--ink-muted);margin-bottom:28px;line-height:1.5}
+.wiz-input{width:100%;padding:16px;border-radius:var(--radius);border:1.5px solid var(--sand-dark);background:var(--cream);font-size:16px;font-family:'DM Sans',sans-serif;color:var(--ink);outline:none;transition:border-color .2s;-webkit-appearance:none}
+.wiz-input:focus{border-color:var(--gold)}.wiz-input::placeholder{color:#C0BAB2}
+.wiz-input-group{margin-bottom:16px}
+.wiz-input-label{font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;display:block}
+.wiz-date-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.wiz-chips{display:flex;flex-wrap:wrap;gap:10px}
+.wiz-chip{padding:12px 18px;border-radius:50px;border:1.5px solid var(--sand-dark);background:var(--cream);font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;color:var(--ink-soft);cursor:pointer;transition:all .2s;-webkit-appearance:none;user-select:none}
+.wiz-chip.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
+.wiz-stepper{display:flex;align-items:center;gap:20px;margin-top:4px}
+.wiz-stepper-btn{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--sand-dark);background:var(--cream);font-size:22px;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.wiz-stepper-btn:active{transform:scale(.93)}
+.wiz-stepper-val{font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:500;min-width:36px;text-align:center}
+.wiz-bottom{position:fixed;bottom:0;left:0;right:0;padding:12px 20px calc(12px + env(safe-area-inset-bottom,8px));background:rgba(245,241,235,.92);backdrop-filter:blur(12px);display:flex;gap:10px;z-index:50}
+.wiz-btn{flex:1;padding:16px;border-radius:var(--radius);border:none;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .15s}
+.wiz-btn:active{transform:scale(.98)}
+.wiz-btn-primary{background:var(--ink);color:#fff}.wiz-btn-primary:disabled{opacity:.35}
+.wiz-btn-secondary{background:var(--cream);color:var(--ink);border:1.5px solid var(--sand-dark);flex:0 0 auto;padding:16px 20px}
+.wiz-budget-toggle{display:flex;gap:10px;margin-bottom:16px}
+.wiz-budget-toggle button{flex:1;padding:14px;border-radius:var(--radius);border:1.5px solid var(--sand-dark);background:var(--cream);font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;color:var(--ink-soft);transition:all .2s}
+.wiz-budget-toggle button.selected{background:var(--ink);color:#fff;border-color:var(--ink)}
+.wiz-budget-row{display:grid;grid-template-columns:100px 1fr;gap:10px;margin-bottom:16px}
+.wiz-budget-row select,.wiz-budget-row input{padding:14px;border-radius:var(--radius);border:1.5px solid var(--sand-dark);background:var(--cream);font-size:15px;font-family:'DM Sans',sans-serif;color:var(--ink);outline:none;-webkit-appearance:none}
+.wiz-budget-presets{display:flex;flex-wrap:wrap;gap:8px}
+.wiz-budget-preset{padding:8px 14px;border-radius:20px;border:1.5px solid var(--sand-dark);background:var(--cream);font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--ink-muted);cursor:pointer;transition:all .2s}
+.wiz-budget-preset.selected{background:var(--gold-light);color:var(--terra);border-color:var(--gold)}
+
+/* GENERATING */
+.generating-screen{position:fixed;inset:0;z-index:9999;background:var(--ink);display:none;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+.generating-screen.active{display:flex}
+.gen-spinner{width:48px;height:48px;border:2.5px solid rgba(255,255,255,.1);border-top-color:var(--gold);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gen-title{font-family:'Cormorant Garamond',serif;font-size:26px;color:#fff;text-align:center}
+.gen-sub{font-size:13px;color:rgba(255,255,255,.4);text-align:center;max-width:260px;line-height:1.5}
+.gen-steps{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.gen-step{font-size:12px;color:rgba(255,255,255,.25);display:flex;align-items:center;gap:8px;transition:color .3s}
+.gen-step.active{color:var(--gold)}.gen-step.done{color:rgba(255,255,255,.5)}
+.gen-step-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* TRIPS, APP, CARDS, EVENTS, etc - same CSS as before */
+.trips-screen{display:none;min-height:100dvh;padding-bottom:32px}.trips-screen.active{display:block}
+.trips-map-box{margin:0 1.25rem 1rem;border-radius:var(--radius);overflow:hidden;border:1px solid rgba(0,0,0,.06);box-shadow:var(--shadow-sm);height:200px;background:var(--cream)}
+.trips-map-empty{display:flex;align-items:center;justify-content:center;height:100%;color:var(--ink-muted);font-size:13px;flex-direction:column;gap:6px}
+.trips-map-empty span:first-child{font-size:32px}
+.trips-header{padding:2.5rem 1.25rem .75rem}
+.trips-header-row{display:flex;align-items:center;justify-content:space-between}
+.trips-title{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:500}
+.trips-new-btn{padding:10px 18px;border-radius:50px;border:none;background:var(--ink);color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;display:flex;align-items:center;gap:6px}
+.trips-new-btn:active{transform:scale(.96)}
+.trips-subtitle{font-size:13px;color:var(--ink-muted);margin-top:4px;margin-bottom:12px}
+.trips-list{padding:0 1.25rem;display:flex;flex-direction:column;gap:12px}
+.trip-card{background:var(--cream);border-radius:var(--radius);border:1px solid rgba(0,0,0,.04);box-shadow:var(--shadow-sm);overflow:hidden;cursor:pointer;transition:box-shadow .2s,transform .1s}
+.trip-card:active{transform:scale(.985)}
+.trip-card-banner{height:6px}.trip-card-body{padding:1rem 1.125rem;display:flex;align-items:center;gap:14px}
+.trip-card-flag{font-size:32px;flex-shrink:0}.trip-card-info{flex:1;min-width:0}
+.trip-card-name{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trip-card-meta{font-size:12px;color:var(--ink-muted);margin-top:2px}
+.trip-card-progress{width:60px;text-align:right;flex-shrink:0}
+.trip-card-pct{font-size:18px;font-weight:700}.trip-card-pct-label{font-size:10px;color:var(--ink-muted)}
+.trip-card-actions{display:flex;border-top:.5px solid var(--sand)}
+.trip-card-action{flex:1;padding:10px;border:none;background:none;font-size:12px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--ink-muted);cursor:pointer;transition:color .15s,background .15s}
+.trip-card-action:hover{background:var(--sand)}.trip-card-action.danger:hover{color:var(--terra)}
+.trip-card-action+.trip-card-action{border-left:.5px solid var(--sand)}
+.trips-empty{text-align:center;padding:3rem 2rem;color:var(--ink-muted)}
+.trips-empty-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.trips-empty-text{font-size:15px;margin-bottom:6px;color:var(--ink-soft);font-weight:500}
+.app-container{display:none}.app-container.active{display:block}
+.app-header{padding:1rem 1.25rem 1.25rem}
+.header-eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.header-title{font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:500;line-height:1.15}
+.header-dates{font-size:13px;color:var(--ink-muted);margin-top:4px}
+.header-progress{display:flex;align-items:center;gap:10px;margin-top:12px}
+.progress-track{flex:1;height:4px;background:var(--sand-dark);border-radius:4px;overflow:hidden}
+.progress-fill{height:100%;width:0%;background:var(--gold);border-radius:4px;transition:width .5s}
+.progress-text{font-size:11px;color:var(--ink-muted);font-weight:500}
+.back-trips-btn{display:flex;align-items:center;gap:6px;padding:8px 14px;margin:0 1.25rem;border:none;background:none;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--ink-muted);cursor:pointer}
+.budget-bar{display:flex;align-items:center;gap:10px;margin:8px 0 0;padding:8px 12px;background:var(--gold-light);border-radius:8px}
+.budget-bar-label{font-size:11px;color:var(--terra);font-weight:600}
+.budget-bar-text{font-size:11px;color:var(--terra);font-weight:500}
+.currency-switcher{display:flex;align-items:center;gap:6px;margin-top:8px}
+.currency-switcher label{font-size:11px;color:var(--ink-muted);font-weight:500}
+.currency-switcher select{padding:4px 8px;border-radius:6px;border:1px solid var(--sand-dark);background:var(--cream);font-size:12px;font-family:'DM Sans',sans-serif;color:var(--ink);outline:none;cursor:pointer}
+.restyle-btn{display:flex;align-items:center;gap:8px;margin:12px 1.25rem 0;padding:10px 16px;border-radius:var(--radius);border:1.5px dashed var(--sand-dark);background:none;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif;color:var(--ink-muted);cursor:pointer;transition:all .2s}
+.restyle-btn:hover{border-color:var(--terra);color:var(--terra)}
+.restyle-panel{margin:12px 1.25rem;padding:16px;background:var(--cream);border-radius:var(--radius);border:1px solid rgba(0,0,0,.04);box-shadow:var(--shadow-sm);display:none}
+.restyle-panel.open{display:block}
+.restyle-panel-title{font-size:13px;font-weight:600;margin-bottom:10px}
+.restyle-panel-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.restyle-go{padding:10px 20px;border-radius:8px;border:none;background:var(--ink);color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+.city-section{margin-top:1.5rem}
+.city-label{display:flex;align-items:center;gap:10px;padding:0 1.25rem;margin-bottom:.75rem}
+.city-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.city-name{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600}
+.city-line{flex:1;height:.5px;background:var(--sand-dark)}
+.day-card{background:var(--cream);margin:0 1rem .75rem;border-radius:var(--radius);overflow:hidden;border:1px solid rgba(0,0,0,.04);box-shadow:var(--shadow-sm)}
+.day-header{padding:.875rem 1rem;cursor:pointer;display:flex;align-items:center;gap:10px}
+.day-date{font-size:11px;font-weight:700;background:var(--sand);padding:3px 8px;border-radius:6px;white-space:nowrap}
+.day-info{flex:1;min-width:0}
+.day-city-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-summary{font-size:11px;color:var(--ink-muted);margin-top:2px}
+.day-chevron{font-size:14px;color:var(--ink-muted);transition:transform .25s;flex-shrink:0}
+.day-card.open .day-chevron{transform:rotate(90deg)}
+.day-body{display:none;padding:0 1rem .75rem}.day-card.open .day-body{display:block}
+.day-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.tag{font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;display:inline-flex;align-items:center;gap:4px}
+.tag-hotel{background:var(--blue-light);color:var(--blue)}
+.event-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:.5px solid var(--sand);position:relative}
+.event-row:last-child{border-bottom:none}
+.event-time{font-size:11px;font-weight:600;color:var(--ink-muted);min-width:44px;padding-top:2px}
+.event-content{flex:1;min-width:0}
+.event-title{font-weight:600;font-size:13.5px}
+.event-desc{font-size:12px;color:var(--ink-muted);margin-top:2px;line-height:1.5}
+.event-cost{font-size:11px;color:var(--terra);font-weight:500;margin-top:3px}
+.event-pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.pill{font-size:11px;font-weight:500;padding:4px 10px;border-radius:20px;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.pill-maps{background:var(--green-light);color:var(--green)}
+.pill-check{background:var(--sand);color:var(--ink-muted);cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+.pill-check.done{background:var(--green);color:#fff}
+.event-row.done{opacity:.45}
+.event-row.deleted-hidden{max-height:0;opacity:0;overflow:hidden;padding:0;border:none;transition:all .3s}
+.btn-remove-item{position:absolute;right:0;top:6px;background:none;border:none;font-size:16px;color:var(--ink-muted);opacity:0;cursor:pointer;padding:4px;transition:opacity .2s}
+.event-row:hover .btn-remove-item{opacity:.5}
+.drag-handle{color:var(--sand-dark);cursor:grab;font-size:14px;padding:2px 4px;user-select:none;flex-shrink:0}
+.event-row.dragging{opacity:.4;background:var(--gold-light)}
+.event-row.drag-over{border-top:2px solid var(--gold)}
+.add-item-row{display:flex;gap:8px;padding:8px 0}
+.add-item-input{flex:1;padding:8px 12px;border-radius:8px;border:1.5px solid var(--sand-dark);background:var(--cream);font-size:13px;font-family:'DM Sans',sans-serif;outline:none}
+.add-item-input:focus{border-color:var(--gold)}
+.add-item-confirm{padding:8px 14px;border-radius:8px;border:none;background:var(--ink);color:#fff;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer}
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(253,252,250,.92);backdrop-filter:blur(12px);display:flex;justify-content:space-around;padding:6px 0 calc(6px + env(safe-area-inset-bottom,8px));border-top:.5px solid var(--sand-dark);z-index:1000}
+.nav-item{display:flex;flex-direction:column;align-items:center;font-size:10px;font-weight:500;color:var(--ink-muted);cursor:pointer;padding:4px 12px;border:none;background:none}
+.nav-item.active{color:var(--ink)}.nav-icon{font-size:22px;margin-bottom:2px}
+.page{display:none;padding-bottom:80px}.page.active{display:block}
+.hotels-list{padding:1.25rem}
+.hotel-card{background:var(--cream);border-radius:var(--radius);overflow:hidden;margin-bottom:12px;border:1px solid rgba(0,0,0,.04);box-shadow:var(--shadow-sm)}
+.hotel-city-strip{padding:6px 12px;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#fff}
+.hotel-body{padding:.75rem 1rem}
+.hotel-name{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:500}
+.hotel-meta{font-size:12px;color:var(--ink-muted);margin-top:3px}
+.hotel-cost{font-size:12px;color:var(--terra);font-weight:500;margin-top:4px}
+.hotel-links{display:flex;gap:8px;margin-top:8px}
+.hotel-link{font-size:11px;padding:4px 10px;border-radius:20px;text-decoration:none;font-weight:500;background:var(--blue-light);color:var(--blue)}
+.checklist-container{padding:1.25rem}
+.checklist-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.checklist-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:500}
+.checklist-add-btn{padding:8px 14px;border-radius:20px;border:1.5px solid var(--sand-dark);background:var(--cream);font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer}
+.checklist-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:.5px solid var(--sand)}
+.checklist-checkbox{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--sand-dark);background:var(--cream);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-size:12px;color:transparent;transition:all .15s}
+.checklist-checkbox.checked{background:var(--green);border-color:var(--green);color:#fff}
+.checklist-text{font-size:14px;flex:1}
+.checklist-item.packed .checklist-text{text-decoration:line-through;opacity:.5}
+.checklist-delete{background:none;border:none;font-size:16px;color:var(--ink-muted);opacity:0;cursor:pointer;padding:4px}
+.checklist-item:hover .checklist-delete{opacity:.5}
+.map-route-btn{display:flex;align-items:center;gap:8px;margin:0 1.25rem .75rem;padding:12px 16px;border-radius:var(--radius);border:1px solid rgba(0,0,0,.06);background:linear-gradient(135deg,#f8f7f5,#fff);font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;box-shadow:var(--shadow-sm);text-decoration:none;color:var(--ink)}
+.map-route-btn:active{transform:scale(.98)}
+.map-route-btn svg{flex-shrink:0}
+.map-route-sub{font-weight:400;font-size:11px;color:var(--ink-muted);margin-top:1px}
+/* Loading overlay */
+.loading-overlay{position:fixed;inset:0;z-index:100000;background:var(--ink);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px}
+.loading-overlay.hidden{display:none}
+.loading-overlay .gen-spinner{width:36px;height:36px}
+.loading-overlay p{color:rgba(255,255,255,.4);font-size:13px}
+
+
+/* ══════════ PREMIUM ITALIA DETAIL LAYOUT + SMART TRIPS MAP ══════════ */
+:root{--paper:#F3EFE6;--border:rgba(26,23,20,0.10);--shadow:0 2px 12px rgba(26,23,20,0.08);--sage:#5A7A5C;--sage-light:#DCE8DC;--pastel-europe:#E8F0FF;--pastel-america:#EAF7F0;--pastel-asia:#FFF4E8;--pastel-africa:#FFF1D8;--pastel-oceania:#EFEAFF;--pastel-global:#F4EFE7}
+#trips-map{height:260px;background:linear-gradient(180deg,#FBFAF6 0%,#F2EFE7 100%);position:relative;border-color:rgba(26,23,20,.08);box-shadow:0 6px 24px rgba(26,23,20,.08)}
+.smart-map-svg{width:100%;height:100%;display:block}.smart-map-label{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;fill:rgba(26,23,20,.34)}.smart-map-country{font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;fill:rgba(26,23,20,.60)}.smart-map-route{fill:none;stroke:var(--gold);stroke-width:2;stroke-linecap:round;stroke-dasharray:5 6;opacity:.75}.smart-map-pin-halo{opacity:.18}.smart-map-pin{stroke:#fff;stroke-width:2}.smart-map-empty-title{font-family:'Cormorant Garamond',serif;font-size:22px;fill:var(--ink);font-weight:500}.smart-map-empty-sub{font-family:'DM Sans',sans-serif;font-size:11px;fill:var(--ink-muted)}
+#trips-screen .continent-legend{display:flex;flex-wrap:wrap;gap:7px;margin:8px 1.25rem 1rem}.continent-chip{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 9px;border-radius:999px;border:1px solid rgba(26,23,20,.06);color:rgba(26,23,20,.56)}.continent-chip.europa{background:var(--pastel-europe)}.continent-chip.america{background:var(--pastel-america)}.continent-chip.asia{background:var(--pastel-asia)}.continent-chip.africa{background:var(--pastel-africa)}.continent-chip.oceania{background:var(--pastel-oceania)}
+#page-itinerary>.back-trips-btn:first-child{position:absolute;z-index:5;margin:10px 1rem;color:rgba(255,255,255,.55);background:rgba(255,255,255,.08);border-radius:999px;padding:7px 12px;backdrop-filter:blur(8px)}
+#page-itinerary #app-header{background:var(--ink);color:var(--cream);padding:3rem 1.25rem 1.5rem;position:relative;overflow:hidden;margin:0 0 1rem 0}
+#page-itinerary #app-header .flag-bg{position:absolute;top:0;right:0;bottom:0;width:54%;display:flex;pointer-events:none;opacity:.07}#page-itinerary #app-header .flag-bg span{flex:1;display:block}
+#page-itinerary #app-header::after{content:attr(data-code);position:absolute;right:-10px;top:50%;transform:translateY(-50%);font-family:'Cormorant Garamond',serif;font-size:120px;font-weight:600;color:rgba(255,255,255,.04);letter-spacing:-4px;pointer-events:none}
+#page-itinerary #app-header .header-eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-weight:500;position:relative;z-index:1}
+#page-itinerary #app-header .header-title{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:500;line-height:1.1;color:#fff;position:relative;z-index:1}
+.flag-mini{display:inline-flex;border-radius:3px;overflow:hidden;width:28px;height:19px;flex-shrink:0;margin-left:8px;vertical-align:middle;position:relative;top:-2px;box-shadow:0 0 0 .5px rgba(255,255,255,.2)}.flag-mini span{flex:1;display:block}.flag-emoji-mini{font-size:24px;margin-left:6px;position:relative;top:-2px}
+#page-itinerary #app-header .header-dates{font-size:13px;color:rgba(255,255,255,.5);margin-top:6px;position:relative;z-index:1}
+#page-itinerary #app-header .header-progress{margin-top:1.25rem;display:flex;align-items:center;gap:10px;position:relative;z-index:1}#page-itinerary #app-header .progress-track{height:3px;background:rgba(255,255,255,.12)}#page-itinerary #app-header .progress-text{font-size:12px;color:rgba(255,255,255,.4)}#page-itinerary #app-header .budget-bar{background:rgba(245,237,224,.10);border:1px solid rgba(255,255,255,.08);position:relative;z-index:1}#page-itinerary #app-header .currency-switcher{position:relative;z-index:1}#page-itinerary #app-header .currency-switcher label{color:rgba(255,255,255,.48)}
+.city-section{margin-top:1.5rem}.city-label{gap:8px;padding:0 1.25rem .5rem;margin-bottom:0}.city-dot{width:7px;height:7px}.city-name{font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-muted);font-weight:500}.city-line{background:var(--border)}
+.day-card{margin:0 1rem .625rem;background:#fff;border:.5px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);transition:box-shadow .2s}.day-card.open{box-shadow:0 4px 20px rgba(26,23,20,.12)}.day-header{display:flex;align-items:center;gap:12px;padding:.875rem 1rem;cursor:pointer;user-select:none}.date-badge{width:46px;height:52px;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;background:var(--paper);color:var(--ink)}.date-num{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;line-height:1}.date-mon{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}.day-main{flex:1;min-width:0}.day-city-name{font-size:15px;font-weight:500;color:var(--ink)}.day-preview{font-size:12px;color:var(--ink-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.day-tags{display:flex;gap:5px;margin-top:5px;margin-bottom:0;flex-wrap:wrap}.tag{font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500;white-space:nowrap}.tag-hotel{background:var(--blue-light);color:var(--blue)}.tag-move{background:var(--gold-light);color:var(--gold)}.tag-free{background:var(--sage-light);color:var(--sage)}.chevron{width:20px;height:20px;border-radius:50%;background:var(--paper);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .25s,background .2s;font-size:12px;color:var(--ink-muted)}.day-card.open .chevron{transform:rotate(90deg);background:var(--ink);color:#fff}.events-panel{display:none;border-top:.5px solid var(--border);background:var(--cream)}.day-card.open .events-panel{display:block}
+.event-row{display:flex;gap:10px;padding:.75rem 1rem;border-bottom:.5px solid var(--border);transition:background .15s;position:relative}.event-row:last-child{border-bottom:none}.event-row.done{opacity:.5}.event-row.done .event-title{text-decoration:line-through}.event-timeline{display:flex;flex-direction:column;align-items:center;width:12px;padding-top:5px;flex-shrink:0}.ev-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}.ev-line{width:1.5px;flex:1;min-height:14px;margin-top:3px;background:var(--border)}.event-content{flex:1;min-width:0}.event-time{font-size:11px;color:var(--ink-muted);margin-bottom:2px;font-weight:400;min-width:0;padding-top:0}.event-title{font-size:14px;font-weight:500;color:var(--ink);line-height:1.3}.event-desc{font-size:12px;color:var(--ink-soft);margin-top:2px;line-height:1.45}.event-cost{font-size:11px;color:var(--terra);font-weight:500;margin-top:3px}.event-pills{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap;align-items:center}.pill{font-size:10px;padding:3px 9px;border-radius:20px;font-weight:500;text-decoration:none;display:inline-flex;align-items:center;gap:4px;cursor:pointer;border:none;outline:none;-webkit-appearance:none}.pill-maps{background:var(--blue-light);color:var(--blue)}.pill-check{background:var(--paper);color:var(--ink-soft);border:.5px solid var(--border)}.pill-check.done{background:var(--sage-light);color:var(--sage);border-color:transparent}.btn-remove-item{top:10px;right:10px}.drag-handle{display:none}.add-item-row{padding:.625rem 1rem;border-top:.5px solid var(--border);background:var(--cream)}
+
+</style>
+</head>
+<body>
+<!-- Loading -->
+<div class="loading-overlay" id="loading"><div class="gen-spinner"></div><p>Carregando...</p></div>
+
+<!-- Login -->
+<div class="login-screen hidden" id="login-screen"><div class="login-bg"></div><div class="login-card">
+<div class="login-icon">✈️</div><div class="login-eyebrow">Trip Planner</div>
+<div class="login-heading" id="login-title">Bem-vindo</div>
+<div class="login-sub" id="login-subtitle">Entre para acessar seus roteiros</div>
+<div class="login-error" id="login-error">&nbsp;</div>
+<div class="login-field"><input class="login-input" id="login-email" type="email" placeholder="E-mail" autocomplete="email"/></div>
+<div class="login-field" id="login-pw-field"><input class="login-input" id="login-pw" type="password" placeholder="Senha" autocomplete="current-password"/><button class="login-pw-toggle" onclick="togglePwVis()">👁</button></div>
+<div class="login-field" id="login-pw2-field" style="display:none"><input class="login-input" id="login-pw2" type="password" placeholder="Confirmar senha" autocomplete="new-password"/></div>
+<button class="login-primary-btn" id="login-btn" onclick="submitAuth()">Entrar</button>
+<div class="login-switch" id="login-switch">Não tem conta? <a onclick="switchMode()">Criar conta</a></div>
+</div></div>
+<button class="logout-btn" id="logout-btn" onclick="logout()">👤 <span id="logout-user"></span> · Sair</button>
+
+<!-- Wizard -->
+<div class="wizard-container hidden" id="wizard">
+<div class="wizard-progress"><div class="wizard-steps"><div class="wizard-step-dot active" id="wdot-0"></div><div class="wizard-step-dot" id="wdot-1"></div><div class="wizard-step-dot" id="wdot-2"></div><div class="wizard-step-dot" id="wdot-3"></div><div class="wizard-step-dot" id="wdot-4"></div></div></div>
+<div class="wizard-page active" id="wpage-0"><div class="wiz-eyebrow">Passo 1 de 5</div><div class="wiz-title">Para onde<br>você vai?</div><div class="wiz-subtitle">País, cidade ou região. Separe múltiplos com vírgula.</div><div class="wiz-input-group"><input class="wiz-input" id="wiz-destination" placeholder="Ex: Japão, Portugal, Grécia…" autocomplete="off"/></div></div>
+<div class="wizard-page" id="wpage-1"><div class="wiz-eyebrow">Passo 2 de 5</div><div class="wiz-title">Quando e<br>com quem?</div><div class="wiz-subtitle">Datas e viajantes.</div><div class="wiz-date-row" style="margin-bottom:16px"><div class="wiz-input-group"><label class="wiz-input-label">Ida</label><input type="date" class="wiz-input" id="wiz-date-start"/></div><div class="wiz-input-group"><label class="wiz-input-label">Volta</label><input type="date" class="wiz-input" id="wiz-date-end"/></div></div><div class="wiz-input-group"><label class="wiz-input-label">Viajantes</label><div class="wiz-stepper"><button class="wiz-stepper-btn" onclick="changeTravelers(-1)">−</button><div class="wiz-stepper-val" id="wiz-travelers">2</div><button class="wiz-stepper-btn" onclick="changeTravelers(1)">+</button></div></div></div>
+<div class="wizard-page" id="wpage-2"><div class="wiz-eyebrow">Passo 3 de 5</div><div class="wiz-title">Qual seu<br>estilo?</div><div class="wiz-subtitle">Selecione o que combina com você.</div><div class="wiz-chips" id="wiz-style-chips"><button class="wiz-chip" onclick="toggleChip(this)" data-style="cultural">🏛 Cultural</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="gastro">🍽 Gastronômico</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="aventura">🥾 Aventura</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="relax">🧘 Relaxamento</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="romantico">💕 Romântico</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="familia">👨‍👩‍👧 Família</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="nightlife">🎶 Vida Noturna</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="natureza">🌿 Natureza</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="compras">🛍 Compras</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="luxo">✨ Luxo</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="mochilao">🎒 Mochilão</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="fotografia">📸 Fotografia</button></div></div>
+<div class="wizard-page" id="wpage-3"><div class="wiz-eyebrow">Passo 4 de 5</div><div class="wiz-title">Orçamento</div><div class="wiz-subtitle">Quer planejar dentro de um orçamento?</div><div class="wiz-budget-toggle"><button onclick="setBudgetMode(false,this)" class="selected">Sem limite</button><button onclick="setBudgetMode(true,this)">Definir orçamento</button></div><div id="budget-fields" style="display:none"><div class="wiz-budget-row"><select id="wiz-budget-currency"><option value="BRL">R$ BRL</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="JPY">¥ JPY</option></select><input type="number" class="wiz-input" id="wiz-budget-amount" placeholder="Valor total" style="padding:14px"/></div><div class="wiz-budget-presets"><button class="wiz-budget-preset" onclick="setBudgetPreset(this,'economico')">🎒 Econômico</button><button class="wiz-budget-preset" onclick="setBudgetPreset(this,'moderado')">☕ Moderado</button><button class="wiz-budget-preset" onclick="setBudgetPreset(this,'confortavel')">🛋 Confortável</button><button class="wiz-budget-preset" onclick="setBudgetPreset(this,'luxo')">💎 Luxo</button></div></div></div>
+<div class="wizard-page" id="wpage-4"><div class="wiz-eyebrow">Passo 5 de 5</div><div class="wiz-title">Algo mais?</div><div class="wiz-subtitle">Restrições, pedidos específicos, acessibilidade.</div><div class="wiz-input-group"><textarea class="wiz-input" id="wiz-notes" placeholder="Ex: Sou vegetariano, tenho criança de 3 anos…" rows="4" style="resize:none"></textarea></div></div>
+<div class="wiz-bottom"><button class="wiz-btn wiz-btn-secondary" id="wiz-back" onclick="wizBack()">←</button><button class="wiz-btn wiz-btn-primary" id="wiz-next" onclick="wizNext()">Continuar</button></div>
+</div>
+
+<!-- Generating -->
+<div class="generating-screen" id="generating"><div class="gen-spinner"></div><div class="gen-title">Criando seu roteiro</div><div class="gen-sub" id="gen-dest-text"></div><div class="gen-steps"><div class="gen-step" id="gen-s0"><div class="gen-step-dot"></div> Pesquisando destinos</div><div class="gen-step" id="gen-s1"><div class="gen-step-dot"></div> Montando itinerário</div><div class="gen-step" id="gen-s2"><div class="gen-step-dot"></div> Selecionando hotéis</div><div class="gen-step" id="gen-s3"><div class="gen-step-dot"></div> Escolhendo restaurantes</div><div class="gen-step" id="gen-s4"><div class="gen-step-dot"></div> Finalizando</div></div></div>
+
+<!-- Trips Screen -->
+<div class="trips-screen" id="trips-screen"><div class="trips-header"><div class="trips-header-row"><div class="trips-title">Minhas Viagens</div><button class="trips-new-btn" onclick="startNewTrip()">+ Nova</button></div><div class="trips-subtitle" id="trips-subtitle"></div></div><div class="trips-map-box" id="trips-map"></div><div class="trips-list" id="trips-list"></div></div>
+
+<!-- App -->
+<div class="app-container" id="app">
+<nav class="bottom-nav"><div class="nav-item active" onclick="showPage('itinerary')"><span class="nav-icon">🗓</span><span>Roteiro</span></div><div class="nav-item" onclick="showPage('hotels')"><span class="nav-icon">🏨</span><span>Hotéis</span></div><div class="nav-item" onclick="showPage('checklist')"><span class="nav-icon">🧳</span><span>Mala</span></div></nav>
+<div class="page active" id="page-itinerary"><button class="back-trips-btn" onclick="backToTrips()">← Minhas Viagens</button><div class="app-header" id="app-header"></div><div id="map-route-container"></div><div id="restyle-container"></div><div id="itinerary-body"></div><button class="back-trips-btn" onclick="backToTrips()" style="margin:16px 1.25rem">← Minhas Viagens</button></div>
+<div class="page" id="page-hotels"><div class="app-header"><div class="header-eyebrow">Hospedagem</div><div class="header-title">Hotéis</div></div><div class="hotels-list" id="hotels-list"></div></div>
+<div class="page" id="page-checklist"><div class="checklist-container"><div class="checklist-header"><div class="checklist-title">Mala</div><button class="checklist-add-btn" onclick="addChecklistItem()">+ Adicionar</button></div><div id="checklist-items"></div></div></div>
+</div>
+<script>
+/* ══════════ FIREBASE INIT ══════════ */
+firebase.initializeApp(firebaseConfig);
+var auth = firebase.auth();
+var db = firebase.firestore();
+var currentUid = null;
+
+/* ══════════ FIRESTORE STORAGE (replaces PS) ══════════ */
+var PS = {
+  _c: {},
+  _userDoc: function(k) {
+    if (!currentUid) return null;
+    return db.collection('users').doc(currentUid).collection('data').doc(k);
+  },
+  load: async function(k, fb) {
+    if (!currentUid) { this._c[k] = fb; return fb; }
+    try {
+      var doc = await this._userDoc(k).get();
+      if (doc.exists) { this._c[k] = doc.data().value; return this._c[k]; }
+    } catch(e) { console.log('PS.load error:', e.message); }
+    this._c[k] = fb;
+    return fb;
+  },
+  save: async function(k, v) {
+    this._c[k] = v;
+    if (!currentUid) return;
+    try { await this._userDoc(k).set({ value: v, updated: firebase.firestore.FieldValue.serverTimestamp() }); } catch(e) { console.log('PS.save error:', e.message); }
+  },
+  remove: async function(k) {
+    delete this._c[k];
+    if (!currentUid) return;
+    try { await this._userDoc(k).delete(); } catch(e) {}
+  }
+};
+
+/* ══════════ AUTH (Firebase) ══════════ */
+var authMode = 'login';
+
+auth.onAuthStateChanged(function(user) {
+  document.getElementById('loading').classList.add('hidden');
+  if (user) {
+    currentUid = user.uid;
+    var displayName = user.email.split('@')[0];
+    document.getElementById('login-screen').classList.add('hidden');
+    document.getElementById('logout-user').textContent = displayName;
+    document.getElementById('logout-btn').classList.add('visible');
+    showTripsScreen();
+  } else {
+    currentUid = null;
+    document.getElementById('login-screen').classList.remove('hidden', 'dismissed');
+    document.getElementById('logout-btn').classList.remove('visible');
+    hideAll();
+  }
+});
+
+async function submitAuth() {
+  var emailEl = document.getElementById('login-email');
+  var pwEl = document.getElementById('login-pw');
+  var err = document.getElementById('login-error');
+  var email = emailEl.value.trim();
+  var pw = pwEl.value;
+  if (!email) { emailEl.focus(); return; }
+  if (!pw) { pwEl.focus(); return; }
+  err.innerHTML = '&nbsp;';
+  document.getElementById('login-btn').disabled = true;
+
+  try {
+    if (authMode === 'register') {
+      var pw2 = document.getElementById('login-pw2').value;
+      if (pw.length < 6) { err.textContent = 'Senha: mín. 6 caracteres.'; document.getElementById('login-btn').disabled = false; return; }
+      if (pw !== pw2) { err.textContent = 'Senhas não coincidem.'; document.getElementById('login-btn').disabled = false; return; }
+      await auth.createUserWithEmailAndPassword(email, pw);
+    } else {
+      await auth.signInWithEmailAndPassword(email, pw);
+    }
+  } catch(e) {
+    var msg = 'Erro ao autenticar.';
+    if (e.code === 'auth/user-not-found' || e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') msg = 'E-mail ou senha incorretos.';
+    else if (e.code === 'auth/email-already-in-use') msg = 'E-mail já cadastrado.';
+    else if (e.code === 'auth/weak-password') msg = 'Senha muito fraca (mín. 6 caracteres).';
+    else if (e.code === 'auth/invalid-email') msg = 'E-mail inválido.';
+    err.textContent = msg;
+    pwEl.classList.add('shake');
+    setTimeout(function() { pwEl.classList.remove('shake'); }, 500);
+  }
+  document.getElementById('login-btn').disabled = false;
+}
+
+function switchMode() {
+  var err = document.getElementById('login-error');
+  err.innerHTML = '&nbsp;';
+  if (authMode === 'login') {
+    authMode = 'register';
+    document.getElementById('login-title').textContent = 'Criar Conta';
+    document.getElementById('login-subtitle').textContent = 'Crie sua conta com e-mail';
+    document.getElementById('login-btn').textContent = 'Criar Conta';
+    document.getElementById('login-pw2-field').style.display = '';
+    document.getElementById('login-switch').innerHTML = 'Já tem conta? <a onclick="switchMode()">Entrar</a>';
+  } else {
+    authMode = 'login';
+    document.getElementById('login-title').textContent = 'Bem-vindo';
+    document.getElementById('login-subtitle').textContent = 'Entre para acessar seus roteiros';
+    document.getElementById('login-btn').textContent = 'Entrar';
+    document.getElementById('login-pw2-field').style.display = 'none';
+    document.getElementById('login-switch').innerHTML = 'Não tem conta? <a onclick="switchMode()">Criar conta</a>';
+  }
+}
+
+function togglePwVis() {
+  var p = document.getElementById('login-pw'), p2 = document.getElementById('login-pw2'), b = document.querySelector('.login-pw-toggle');
+  if (p.type === 'password') { p.type = 'text'; p2.type = 'text'; b.textContent = '🔒'; }
+  else { p.type = 'password'; p2.type = 'password'; b.textContent = '👁'; }
+}
+
+function logout() {
+  auth.signOut();
+  currentUid = null;
+  PS._c = {};
+}
+
+/* ══════════ CURRENCIES ══════════ */
+var CURRENCIES = { BRL:{s:'R$',r:1}, USD:{s:'$',r:0.18}, EUR:{s:'€',r:0.17}, GBP:{s:'£',r:0.14}, JPY:{s:'¥',r:27.5} };
+var displayCurrency = 'BRL', baseCurrency = 'BRL';
+function convertCost(a, from, to) { if (!a || from === to) return a; return Math.round(a / CURRENCIES[from].r * CURRENCIES[to].r); }
+function formatMoney(a, c) { if (!a) return ''; c = c || displayCurrency; return (CURRENCIES[c] || CURRENCIES.BRL).s + ' ' + a.toLocaleString('pt-BR'); }
+
+/* ══════════ MULTI-TRIP ══════════ */
+var activeTripId = null, editingTripId = null;
+var WIZ_STEPS = 5, wizStep = 0, travelers = 2, budgetEnabled = false, budgetPreset = '';
+
+async function loadTripIndex() { return await PS.load('tp_trip_index', []); }
+async function saveTripIndex(idx) { await PS.save('tp_trip_index', idx); }
+function tripKey(id, s) { return 'tp_' + id + '_' + s; }
+
+/* ══════════ SCREEN MGMT ══════════ */
+function hideAll() {
+  document.getElementById('wizard').classList.add('hidden');
+  document.getElementById('generating').classList.remove('active');
+  document.getElementById('trips-screen').classList.remove('active');
+  document.getElementById('app').classList.remove('active');
+}
+
+/* ══════════ TRIPS SCREEN ══════════ */
+async function showTripsScreen() { hideAll(); document.getElementById('trips-screen').classList.add('active'); await renderTripsList(); }
+
+async function renderTripsList() {
+  var index = await loadTripIndex();
+  var container = document.getElementById('trips-list');
+  var subtitle = document.getElementById('trips-subtitle');
+  var mapEl = document.getElementById('trips-map');
+  if (!index.length) {
+    subtitle.textContent = '';
+    mapEl.innerHTML = '<div class="trips-map-empty"><span>🌍</span><span>Suas viagens aparecerão aqui</span></div>';
+    container.innerHTML = '<div class="trips-empty"><div class="trips-empty-icon">✈️</div><div class="trips-empty-text">Nenhuma viagem ainda</div><div class="trips-empty-sub">Crie seu primeiro roteiro</div></div>';
+    return;
+  }
+  subtitle.textContent = index.length + ' viage' + (index.length === 1 ? 'm' : 'ns');
+  var pins = [];
+  for (var i = 0; i < index.length; i++) {
+    var t = index[i];
+    var d = await PS.load(tripKey(t.id, 'data'), null);
+    if (d) { var meta = inferCountryMeta(d.country || d.tripName || t.name, t.flag); var stop = d.mapStops && d.mapStops.length ? d.mapStops[0] : null; pins.push({ lat: stop ? stop.lat : meta.lat, lng: stop ? stop.lng : meta.lng, label: t.flag || meta.emoji || '📍', emoji: t.flag || meta.emoji || '📍', name: meta.name, continent: meta.continent, color: meta.color }); }
+  }
+  if (pins.length) renderTripsMap(pins, mapEl);
+  else mapEl.innerHTML = '<div class="trips-map-empty"><span>🌍</span><span>Mapa</span></div>';
+  var html = '';
+  for (var i = 0; i < index.length; i++) {
+    var t = index[i];
+    var checks = await PS.load(tripKey(t.id, 'checks'), {});
+    var deleted = await PS.load(tripKey(t.id, 'deleted'), []);
+    var delSet = new Set(deleted);
+    var data = await PS.load(tripKey(t.id, 'data'), null);
+    var total = 0, done = 0;
+    if (data && data.cities) data.cities.forEach(function(c, ci) { c.days.forEach(function(d, di) { d.events.forEach(function(e, ei) { var eid = 'c' + ci + 'd' + di + 'e' + ei; if (!delSet.has(eid)) { total++; if (checks[eid]) done++; } }); }); });
+    var pct = total > 0 ? Math.round(done / total * 100) : 0;
+    var color = t.color || '#C4622D';
+    var meta = t.dateStart && t.dateEnd ? formatShortDate(t.dateStart) + ' → ' + formatShortDate(t.dateEnd) : '';
+    html += '<div class="trip-card"><div class="trip-card-banner" style="background:' + color + '"></div><div class="trip-card-body" onclick="openTrip(\'' + t.id + '\')"><div class="trip-card-flag">' + (t.flag || '✈️') + '</div><div class="trip-card-info"><div class="trip-card-name">' + t.name + '</div><div class="trip-card-meta">' + meta + '</div></div><div class="trip-card-progress"><div class="trip-card-pct">' + pct + '%</div><div class="trip-card-pct-label">completo</div></div></div><div class="trip-card-actions"><button class="trip-card-action" onclick="openTrip(\'' + t.id + '\')">Abrir</button><button class="trip-card-action" onclick="editTrip(\'' + t.id + '\')">✏️ Editar</button><button class="trip-card-action danger" onclick="deleteTrip(\'' + t.id + '\')">Excluir</button></div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function normalizeCountryName(raw) {
+  raw = (raw || '').toString().toLowerCase();
+  var first = raw.split(',')[0].trim();
+  return first || raw;
+}
+function inferCountryMeta(raw, flag) {
+  var s = normalizeCountryName(raw);
+  var db = [
+    {keys:['itália','italia','roma','florença','veneza','milão'], name:'Itália', continent:'Europa', lat:41.9, lng:12.5, color:'#7FAAFF', emoji:'🇮🇹'},
+    {keys:['portugal','lisboa','porto'], name:'Portugal', continent:'Europa', lat:39.4, lng:-8.2, color:'#7FAAFF', emoji:'🇵🇹'},
+    {keys:['frança','franca','paris'], name:'França', continent:'Europa', lat:46.2, lng:2.2, color:'#7FAAFF', emoji:'🇫🇷'},
+    {keys:['espanha','barcelona','madrid'], name:'Espanha', continent:'Europa', lat:40.4, lng:-3.7, color:'#7FAAFF', emoji:'🇪🇸'},
+    {keys:['inglaterra','reino unido','londres'], name:'Reino Unido', continent:'Europa', lat:54.5, lng:-2.4, color:'#7FAAFF', emoji:'🇬🇧'},
+    {keys:['alemanha','berlim'], name:'Alemanha', continent:'Europa', lat:51.2, lng:10.4, color:'#7FAAFF', emoji:'🇩🇪'},
+    {keys:['grécia','grecia','atenas'], name:'Grécia', continent:'Europa', lat:39.0, lng:22.0, color:'#7FAAFF', emoji:'🇬🇷'},
+    {keys:['brasil','rio','são paulo','porto alegre'], name:'Brasil', continent:'América', lat:-14.2, lng:-51.9, color:'#7FD1AE', emoji:'🇧🇷'},
+    {keys:['eua','estados unidos','nova york','miami','orlando'], name:'Estados Unidos', continent:'América', lat:39.8, lng:-98.6, color:'#7FD1AE', emoji:'🇺🇸'},
+    {keys:['argentina','buenos aires'], name:'Argentina', continent:'América', lat:-38.4, lng:-63.6, color:'#7FD1AE', emoji:'🇦🇷'},
+    {keys:['chile','santiago'], name:'Chile', continent:'América', lat:-35.7, lng:-71.5, color:'#7FD1AE', emoji:'🇨🇱'},
+    {keys:['canadá','canada','toronto','vancouver'], name:'Canadá', continent:'América', lat:56.1, lng:-106.3, color:'#7FD1AE', emoji:'🇨🇦'},
+    {keys:['méxico','mexico','cancun'], name:'México', continent:'América', lat:23.6, lng:-102.5, color:'#7FD1AE', emoji:'🇲🇽'},
+    {keys:['peru','lima'], name:'Peru', continent:'América', lat:-9.2, lng:-75.0, color:'#7FD1AE', emoji:'🇵🇪'},
+    {keys:['japão','japao','tóquio','tokyo'], name:'Japão', continent:'Ásia', lat:36.2, lng:138.2, color:'#FFBE7F', emoji:'🇯🇵'},
+    {keys:['tailândia','tailandia','bangkok'], name:'Tailândia', continent:'Ásia', lat:15.9, lng:101.0, color:'#FFBE7F', emoji:'🇹🇭'},
+    {keys:['coreia','seul'], name:'Coreia do Sul', continent:'Ásia', lat:35.9, lng:127.8, color:'#FFBE7F', emoji:'🇰🇷'},
+    {keys:['turquia','istambul'], name:'Turquia', continent:'Ásia', lat:39.0, lng:35.2, color:'#FFBE7F', emoji:'🇹🇷'},
+    {keys:['marrocos','marrakesh'], name:'Marrocos', continent:'África', lat:31.8, lng:-7.1, color:'#F2C879', emoji:'🇲🇦'},
+    {keys:['austrália','australia','sydney'], name:'Austrália', continent:'Oceania', lat:-25.3, lng:133.8, color:'#B9A7FF', emoji:'🇦🇺'}
+  ];
+  for (var i=0;i<db.length;i++) for (var k=0;k<db[i].keys.length;k++) if (s.indexOf(db[i].keys[k]) !== -1) return Object.assign({}, db[i], {emoji: flag || db[i].emoji});
+  return {name: raw || 'Destino', continent:'Mundo', lat:20, lng:0, color:'#C49B5C', emoji: flag || '📍'};
+}
+function projectMap(lat,lng,W,H){ return {x:((lng+180)/360)*W, y:((90-lat)/180)*H}; }
+function smartRoutePins(pins){
+  if (pins.length <= 2) return pins.slice();
+  var ordered=[pins[0]], rest=pins.slice(1);
+  function dist(a,b){ var dx=a.lat-b.lat, dy=a.lng-b.lng; return Math.sqrt(dx*dx+dy*dy); }
+  while(rest.length){ var last=ordered[ordered.length-1], best=0; for(var i=1;i<rest.length;i++) if(dist(last,rest[i])<dist(last,rest[best])) best=i; ordered.push(rest[best]); rest.splice(best,1); }
+  return ordered;
+}
+function renderTripsMap(pins, el) {
+  var W = 600, H = 280;
+  if (!pins || !pins.length) { el.innerHTML = '<div class="trips-map-empty"><span>🌍</span><span>Suas viagens aparecerão aqui</span></div>'; return; }
+  var unique = [], seen = {};
+  pins.forEach(function(p){ var key=(p.name||p.label||'')+'_'+Math.round(p.lat)+'_'+Math.round(p.lng); if(!seen[key]){seen[key]=1; unique.push(p);} });
+  var route = smartRoutePins(unique);
+  var routePath = route.map(function(p,i){ var q=projectMap(p.lat,p.lng,W,H); return (i?'L':'M') + q.x.toFixed(1)+' '+q.y.toFixed(1); }).join(' ');
+  var continents = {};
+  unique.forEach(function(p){ continents[p.continent || 'Mundo']=true; });
+  var pinSvg = '';
+  unique.forEach(function(p) { var q = projectMap(p.lat,p.lng,W,H); var color=p.color||'#C49B5C'; pinSvg += '<g transform="translate(' + q.x.toFixed(1) + ',' + q.y.toFixed(1) + ')"><circle class="smart-map-pin-halo" r="17" fill="'+color+'"/><circle class="smart-map-pin" r="7" fill="'+color+'"/><text class="smart-map-country" y="-17" text-anchor="middle">' + (p.emoji || p.label || '📍') + '</text></g>'; });
+  el.innerHTML = '<svg class="smart-map-svg" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="ocean" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FBFAF6"/><stop offset="1" stop-color="#EFEADF"/></linearGradient></defs><rect width="'+W+'" height="'+H+'" rx="0" fill="url(#ocean)"/><ellipse cx="145" cy="112" rx="86" ry="58" fill="#DCE8DC" opacity=".72"/><ellipse cx="290" cy="92" rx="56" ry="58" fill="#E8F0FF" opacity=".95"/><ellipse cx="315" cy="178" rx="42" ry="52" fill="#FFF1D8" opacity=".95"/><ellipse cx="418" cy="114" rx="96" ry="57" fill="#FFF4E8" opacity=".9"/><ellipse cx="510" cy="196" rx="44" ry="30" fill="#EFEAFF" opacity=".92"/><ellipse cx="170" cy="205" rx="45" ry="52" fill="#EAF7F0" opacity=".85"/><text class="smart-map-label" x="286" y="54">Europa</text><text class="smart-map-label" x="126" y="70">América</text><text class="smart-map-label" x="418" y="67">Ásia</text><text class="smart-map-label" x="306" y="240">África</text><text class="smart-map-label" x="497" y="238">Oceania</text>' + (route.length>1?'<path class="smart-map-route" d="'+routePath+'"/>':'') + pinSvg + '</svg>';
+  var existing=document.querySelector('#trips-screen .continent-legend'); if(existing) existing.remove();
+  var legend = document.createElement('div'); legend.className='continent-legend';
+  Object.keys(continents).sort().forEach(function(c){ var cls=c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace('á','a'); if(cls.indexOf('america')!==-1) cls='america'; else if(cls.indexOf('asia')!==-1) cls='asia'; else if(cls.indexOf('africa')!==-1) cls='africa'; else if(cls.indexOf('oceania')!==-1) cls='oceania'; else if(cls.indexOf('europa')!==-1) cls='europa'; else cls=''; legend.innerHTML += '<span class="continent-chip '+cls+'">'+c+'</span>'; });
+  el.parentNode.insertBefore(legend, el.nextSibling);
+}
+
+async function openTrip(id) { activeTripId = id; var t = await PS.load(tripKey(id, 'data'), null); if (!t) return; baseCurrency = t.budgetCurrency || 'BRL'; displayCurrency = baseCurrency; hideAll(); renderApp(t); }
+async function editTrip(id) { editingTripId = id; var t = await PS.load(tripKey(id, 'data'), null); if (!t) return; hideAll(); document.getElementById('wizard').classList.remove('hidden'); document.getElementById('wiz-destination').value = t.country || t.tripName || ''; var allD = t.cities.reduce(function(a, c) { return a.concat(c.days.map(function(d) { return d.date; })); }, []).sort(); if (allD.length) { document.getElementById('wiz-date-start').value = allD[0]; document.getElementById('wiz-date-end').value = allD[allD.length - 1]; } document.querySelectorAll('#wiz-style-chips .wiz-chip').forEach(function(c) { c.classList.remove('selected'); if (t._styles && t._styles.indexOf(c.dataset.style) !== -1) c.classList.add('selected'); }); wizStep = 0; wizUpdateDots(); document.querySelectorAll('.wizard-page').forEach(function(p) { p.classList.remove('active'); }); document.getElementById('wpage-0').classList.add('active'); }
+async function deleteTrip(id) { if (!confirm('Excluir esta viagem?')) return; var idx = await loadTripIndex(); idx = idx.filter(function(t) { return t.id !== id; }); await saveTripIndex(idx); await PS.remove(tripKey(id, 'data')); await PS.remove(tripKey(id, 'checks')); await PS.remove(tripKey(id, 'deleted')); await PS.remove(tripKey(id, 'checklist')); await renderTripsList(); }
+function startNewTrip() { editingTripId = null; hideAll(); document.getElementById('wizard').classList.remove('hidden'); wizStep = 0; wizUpdateDots(); document.querySelectorAll('.wiz-chip').forEach(function(c) { c.classList.remove('selected'); }); document.getElementById('wiz-destination').value = ''; document.getElementById('wiz-notes').value = ''; document.getElementById('wiz-budget-amount').value = ''; budgetEnabled = false; budgetPreset = ''; document.querySelectorAll('.wiz-budget-toggle button').forEach(function(b, i) { b.classList.toggle('selected', i === 0); }); document.getElementById('budget-fields').style.display = 'none'; document.querySelectorAll('.wizard-page').forEach(function(p) { p.classList.remove('active'); }); document.getElementById('wpage-0').classList.add('active'); var today = new Date(); var s = new Date(today); s.setDate(s.getDate() + 30); var e = new Date(s); e.setDate(e.getDate() + 7); document.getElementById('wiz-date-start').value = s.toISOString().split('T')[0]; document.getElementById('wiz-date-end').value = e.toISOString().split('T')[0]; }
+function backToTrips() { activeTripId = null; hideAll(); showTripsScreen(); }
+
+/* ══════════ WIZARD ══════════ */
+function wizUpdateDots() { for (var i = 0; i < WIZ_STEPS; i++) { var d = document.getElementById('wdot-' + i); d.className = 'wizard-step-dot'; if (i < wizStep) d.classList.add('done'); if (i === wizStep) d.classList.add('active'); } document.getElementById('wiz-next').textContent = wizStep === WIZ_STEPS - 1 ? '✨ Gerar Roteiro' : 'Continuar'; }
+function wizNext() { if (wizStep === 0 && !document.getElementById('wiz-destination').value.trim()) { document.getElementById('wiz-destination').focus(); return; } if (wizStep === 1) { var s = document.getElementById('wiz-date-start').value, e = document.getElementById('wiz-date-end').value; if (!s || !e) return; } if (wizStep === WIZ_STEPS - 1) { generateTrip(); return; } document.getElementById('wpage-' + wizStep).classList.remove('active'); wizStep++; document.getElementById('wpage-' + wizStep).classList.add('active'); wizUpdateDots(); }
+function wizBack() { if (wizStep <= 0) { backToTrips(); return; } document.getElementById('wpage-' + wizStep).classList.remove('active'); wizStep--; document.getElementById('wpage-' + wizStep).classList.add('active'); wizUpdateDots(); }
+function changeTravelers(d) { travelers = Math.max(1, Math.min(20, travelers + d)); document.getElementById('wiz-travelers').textContent = travelers; }
+function toggleChip(el) { el.classList.toggle('selected'); }
+function setBudgetMode(on, btn) { budgetEnabled = on; document.querySelectorAll('.wiz-budget-toggle button').forEach(function(b) { b.classList.remove('selected'); }); btn.classList.add('selected'); document.getElementById('budget-fields').style.display = on ? '' : 'none'; }
+function setBudgetPreset(btn, p) { budgetPreset = p; document.querySelectorAll('.wiz-budget-preset').forEach(function(b) { b.classList.remove('selected'); }); btn.classList.add('selected'); }
+
+/* ══════════ FLAG & MOCK HELPERS ══════════ */
+function getCountryFlag(dest) { var flags = {'brasil':'🇧🇷','rio':'🇧🇷','são paulo':'🇧🇷','portugal':'🇵🇹','lisboa':'🇵🇹','japão':'🇯🇵','tóquio':'🇯🇵','eua':'🇺🇸','estados unidos':'🇺🇸','nova york':'🇺🇸','miami':'🇺🇸','orlando':'🇺🇸','frança':'🇫🇷','paris':'🇫🇷','itália':'🇮🇹','italia':'🇮🇹','roma':'🇮🇹','inglaterra':'🇬🇧','londres':'🇬🇧','espanha':'🇪🇸','barcelona':'🇪🇸','alemanha':'🇩🇪','argentina':'🇦🇷','chile':'🇨🇱','mexico':'🇲🇽','grécia':'🇬🇷','grecia':'🇬🇷','tailândia':'🇹🇭','turquia':'🇹🇷','canadá':'🇨🇦','colombia':'🇨🇴','peru':'🇵🇪','coreia':'🇰🇷','holanda':'🇳🇱','croácia':'🇭🇷','marrocos':'🇲🇦','irlanda':'🇮🇪','austrália':'🇦🇺'}; var l = dest.toLowerCase(); for (var k in flags) { if (l.indexOf(k) !== -1) return flags[k]; } return '✈️'; }
+
+function generateMockTripData(dest, dateStart, dateEnd, numDays, styles) {
+  var city = dest.split(',')[0].trim(); var flag = getCountryFlag(dest);
+  var days = []; var start = new Date(dateStart + 'T00:00:00');
+
+  /* Budget calculation */
+  var budgetAmount = 0;
+  if (budgetEnabled) budgetAmount = parseInt(document.getElementById('wiz-budget-amount').value) || 0;
+  var budgetCur = document.getElementById('wiz-budget-currency').value || 'BRL';
+  var dailyBudget = budgetAmount > 0 ? Math.floor(budgetAmount / numDays) : 0;
+  var hotelPerNight = budgetAmount > 0 ? Math.min(Math.floor(dailyBudget * 0.35), 500) : 300;
+  function sc(base) { if (budgetAmount <= 0) return base; var ab = dailyBudget - hotelPerNight; var sf = ab > 0 ? Math.min(ab / 350, 1.5) : 0.3; return Math.max(0, Math.round(base * sf)); }
+
+  /* Large pool of varied activities per category, each with multiple options */
+  var pool = {
+    cultural: [
+      {time:'09:30',title:'Centro histórico de '+city,desc:'Caminhar pelo coração da cidade',type:'sight',cost:sc(0)},
+      {time:'10:00',title:'Museu principal de '+city,desc:'Acervo artístico e histórico',type:'sight',cost:sc(45)},
+      {time:'10:30',title:'Catedral e igrejas históricas',desc:'Arquitetura religiosa',type:'sight',cost:sc(0)},
+      {time:'14:00',title:'Bairro artístico',desc:'Galerias e ateliês locais',type:'sight',cost:sc(30)},
+      {time:'11:00',title:'Mercado municipal de '+city,desc:'Cultura e sabores locais',type:'sight',cost:sc(20)},
+      {time:'15:00',title:'Palácio e jardins',desc:'Arquitetura e paisagismo',type:'sight',cost:sc(40)},
+      {time:'16:00',title:'Walking tour guiado',desc:'Guia local conta a história',type:'activity',cost:sc(60)},
+      {time:'14:30',title:'Museu de arte moderna',desc:'Arte contemporânea',type:'sight',cost:sc(35)},
+      {time:'10:00',title:'Ruínas e sítio arqueológico',desc:'Vestígios do passado',type:'sight',cost:sc(50)},
+      {time:'11:30',title:'Teatro histórico',desc:'Visita guiada ao teatro',type:'sight',cost:sc(25)}
+    ],
+    gastro: [
+      {time:'13:00',title:'Almoço típico regional',desc:'Culinária autêntica',type:'food',cost:sc(80)},
+      {time:'20:00',title:'Restaurante premiado',desc:'Alta gastronomia local',type:'food',cost:sc(130)},
+      {time:'16:00',title:'Tour de street food',desc:'Sabores de rua',type:'food',cost:sc(45)},
+      {time:'11:00',title:'Aula de culinária local',desc:'Aprenda receitas típicas',type:'activity',cost:sc(100)},
+      {time:'17:00',title:'Degustação de vinhos',desc:'Vinícolas da região',type:'food',cost:sc(70)},
+      {time:'19:30',title:'Jantar com vista panorâmica',desc:'Gastronomia e paisagem',type:'food',cost:sc(110)},
+      {time:'15:00',title:'Café artesanal',desc:'Baristas locais',type:'food',cost:sc(25)},
+      {time:'20:30',title:'Jantar tradicional familiar',desc:'Receita da avó',type:'food',cost:sc(75)}
+    ],
+    aventura: [
+      {time:'08:00',title:'Trilha ecológica',desc:'Natureza e aventura',type:'activity',cost:sc(55)},
+      {time:'09:00',title:'Rapel ou escalada',desc:'Adrenalina nas alturas',type:'activity',cost:sc(90)},
+      {time:'07:30',title:'Canoagem ou rafting',desc:'Aventura aquática',type:'activity',cost:sc(110)},
+      {time:'10:00',title:'Tirolesa panorâmica',desc:'Vista aérea da região',type:'activity',cost:sc(70)},
+      {time:'08:30',title:'Ciclismo pela região',desc:'Pedalando entre paisagens',type:'activity',cost:sc(40)},
+      {time:'14:00',title:'Mergulho ou snorkeling',desc:'Vida marinha',type:'activity',cost:sc(120)}
+    ],
+    relax: [
+      {time:'10:00',title:'Spa e massagem',desc:'Relaxamento total',type:'activity',cost:sc(180)},
+      {time:'09:00',title:'Yoga ao ar livre',desc:'Meditação com vista',type:'activity',cost:sc(40)},
+      {time:'14:00',title:'Banho termal',desc:'Águas termais naturais',type:'activity',cost:sc(60)},
+      {time:'16:00',title:'Tarde na piscina do hotel',desc:'Descanso merecido',type:'activity',cost:sc(0)},
+      {time:'11:00',title:'Passeio contemplativo pelo parque',desc:'Natureza e paz',type:'activity',cost:sc(0)}
+    ],
+    romantico: [
+      {time:'18:00',title:'Pôr do sol no mirante',desc:'Momento especial a dois',type:'activity',cost:sc(0)},
+      {time:'20:30',title:'Jantar romântico à luz de velas',desc:'Gastronomia refinada',type:'food',cost:sc(160)},
+      {time:'17:00',title:'Passeio de barco ao entardecer',desc:'Romance na água',type:'activity',cost:sc(90)},
+      {time:'15:00',title:'Piquenique em jardim botânico',desc:'Charme ao ar livre',type:'activity',cost:sc(50)},
+      {time:'10:00',title:'Spa de casal',desc:'Relaxamento a dois',type:'activity',cost:sc(200)}
+    ],
+    natureza: [
+      {time:'08:00',title:'Parque natural de '+city,desc:'Fauna e flora local',type:'sight',cost:sc(25)},
+      {time:'07:00',title:'Observação de pássaros',desc:'Biodiversidade',type:'activity',cost:sc(35)},
+      {time:'09:30',title:'Cachoeira e trilha',desc:'Banho de cachoeira',type:'activity',cost:sc(20)},
+      {time:'14:00',title:'Jardim botânico',desc:'Espécies raras',type:'sight',cost:sc(15)},
+      {time:'16:00',title:'Praia ou lago',desc:'Tarde em contato com a natureza',type:'activity',cost:sc(0)}
+    ],
+    familia: [
+      {time:'10:00',title:'Parque temático',desc:'Diversão para toda família',type:'activity',cost:sc(100)},
+      {time:'14:00',title:'Aquário ou zoológico',desc:'Animais e educação',type:'sight',cost:sc(50)},
+      {time:'09:00',title:'Oficina criativa para crianças',desc:'Arte e diversão',type:'activity',cost:sc(40)},
+      {time:'15:00',title:'Playground e praça',desc:'Área de lazer',type:'activity',cost:sc(0)}
+    ],
+    nightlife: [
+      {time:'22:00',title:'Bar com música ao vivo',desc:'Noite animada',type:'activity',cost:sc(60)},
+      {time:'21:00',title:'Rooftop bar',desc:'Drinks com vista',type:'activity',cost:sc(80)},
+      {time:'23:00',title:'Show local',desc:'Música da região',type:'activity',cost:sc(50)},
+      {time:'20:00',title:'Pub crawl',desc:'Tour por bares',type:'activity',cost:sc(70)}
+    ],
+    compras: [
+      {time:'15:00',title:'Feira de artesanato',desc:'Souvenirs artesanais',type:'activity',cost:sc(80)},
+      {time:'14:00',title:'Shopping center',desc:'Lojas e marcas',type:'activity',cost:sc(150)},
+      {time:'11:00',title:'Mercado de antiguidades',desc:'Achados únicos',type:'activity',cost:sc(60)},
+      {time:'16:00',title:'Boutiques locais',desc:'Moda local',type:'activity',cost:sc(100)}
+    ],
+    luxo: [
+      {time:'11:00',title:'Experiência exclusiva VIP',desc:'Atendimento premium',type:'activity',cost:sc(300)},
+      {time:'14:00',title:'Helicóptero panorâmico',desc:'Vista aérea',type:'activity',cost:sc(400)},
+      {time:'16:00',title:'Champagne e caviar',desc:'Degustação premium',type:'food',cost:sc(200)}
+    ],
+    mochilao: [
+      {time:'10:00',title:'Walking tour gratuito',desc:'Tour a pé pelo centro',type:'activity',cost:sc(0)},
+      {time:'12:00',title:'Comida de rua barata',desc:'Sabor por pouco',type:'food',cost:sc(15)},
+      {time:'14:00',title:'Parque público',desc:'Relaxar de graça',type:'activity',cost:sc(0)}
+    ],
+    fotografia: [
+      {time:'06:00',title:'Sunrise photo walk',desc:'Luz dourada da manhã',type:'activity',cost:sc(0)},
+      {time:'17:00',title:'Golden hour nos mirantes',desc:'Melhor luz para fotos',type:'activity',cost:sc(0)},
+      {time:'10:00',title:'Street photography no centro',desc:'Retratos urbanos',type:'activity',cost:sc(0)}
+    ]
+  };
+
+  /* Varied breakfast options */
+  var breakfasts = [
+    {time:'08:30',title:'Café da manhã no hotel',desc:'Buffet incluso',type:'food',cost:0},
+    {time:'09:00',title:'Padaria artesanal',desc:'Pães e cafés locais',type:'food',cost:sc(25)},
+    {time:'08:00',title:'Café colonial',desc:'Mesa farta',type:'food',cost:sc(35)},
+    {time:'09:30',title:'Brunch local',desc:'O melhor da manhã',type:'food',cost:sc(45)}
+  ];
+  /* Varied lunch options */
+  var lunches = [
+    {time:'12:30',title:'Almoço em restaurante local',desc:'Culinária caseira',type:'food',cost:sc(55)},
+    {time:'13:00',title:'Bistrô no centro',desc:'Menu do dia',type:'food',cost:sc(65)},
+    {time:'12:00',title:'Almoço no mercado',desc:'Comida fresca do mercado',type:'food',cost:sc(40)},
+    {time:'13:30',title:'Restaurante da praça',desc:'Sabores regionais',type:'food',cost:sc(50)}
+  ];
+  /* Varied dinner options */
+  var dinners = [
+    {time:'19:30',title:'Jantar no bairro gastronômico',desc:'Gastronomia autoral',type:'food',cost:sc(80)},
+    {time:'20:00',title:'Trattoria local',desc:'Ambiente acolhedor',type:'food',cost:sc(70)},
+    {time:'19:00',title:'Comida de rua noturna',desc:'Sabores da noite',type:'food',cost:sc(35)},
+    {time:'20:30',title:'Restaurante com vista',desc:'Jantar panorâmico',type:'food',cost:sc(90)}
+  ];
+
+  /* Day titles that vary */
+  var dayTitles = [
+    'Descobrindo '+city, 'Explorando '+city, 'Aventuras em '+city,
+    'Dia cultural em '+city, 'Passeios em '+city, 'Imersão em '+city,
+    'Conhecendo '+city, 'Dia livre em '+city, 'Vivências em '+city,
+    'Caminhadas em '+city, 'Surpresas de '+city, 'Sabores de '+city
+  ];
+
+  /* Track used activities to avoid repeats */
+  var usedActs = {};
+  function pickFrom(arr, key) {
+    if (!usedActs[key]) usedActs[key] = [];
+    var available = arr.filter(function(_, idx) { return usedActs[key].indexOf(idx) === -1; });
+    if (available.length === 0) { usedActs[key] = []; available = arr; }
+    var idx = Math.floor(Math.random() * available.length);
+    var picked = available[idx];
+    var origIdx = arr.indexOf(picked);
+    usedActs[key].push(origIdx);
+    return JSON.parse(JSON.stringify(picked));
+  }
+
+  var runningTotal = 0;
+  for (var i = 0; i < numDays; i++) {
+    var cd = new Date(start); cd.setDate(start.getDate() + i);
+    var dayActs = [];
+
+    /* Add varied meals */
+    dayActs.push(pickFrom(breakfasts, 'bkf'));
+    dayActs.push(pickFrom(lunches, 'lnch'));
+    dayActs.push(pickFrom(dinners, 'dnr'));
+
+    /* Pick 2-3 activities from selected styles (rotating through them) */
+    var activeStyles = (styles && styles.length) ? styles : ['cultural'];
+    var numExtra = 2 + (i % 2); /* alternates between 2 and 3 extra activities */
+    for (var j = 0; j < numExtra; j++) {
+      var styleKey = activeStyles[(i * numExtra + j) % activeStyles.length];
+      if (pool[styleKey] && pool[styleKey].length) {
+        dayActs.push(pickFrom(pool[styleKey], styleKey));
+      }
+    }
+
+    dayActs.sort(function(a, b) { return (parseInt(a.time) || 0) - (parseInt(b.time) || 0); });
+
+    /* Budget enforcement: scale down costs if exceeding daily limit */
+    if (budgetAmount > 0) {
+      var dayCost = dayActs.reduce(function(s, e) { return s + (e.cost || 0); }, 0);
+      var maxAct = dailyBudget - hotelPerNight;
+      if (dayCost > maxAct && maxAct > 0) {
+        var ratio = maxAct / dayCost;
+        dayActs.forEach(function(e) { e.cost = Math.round((e.cost || 0) * ratio); });
+      }
+    }
+
+    runningTotal += dayActs.reduce(function(s, e) { return s + (e.cost || 0); }, 0) + hotelPerNight;
+
+    var title = i === 0 ? 'Chegada em ' + city : i === numDays - 1 ? 'Último dia em ' + city : dayTitles[i % dayTitles.length];
+    days.push({ date: cd.toISOString().split('T')[0], title: title, events: dayActs });
+  }
+
+  var totalCost = budgetAmount > 0 ? Math.min(runningTotal, budgetAmount) : runningTotal;
+  return {
+    tripName: city + ' - Roteiro', country: city, flag: flag, color: '#C4622D',
+    totalCost: totalCost, budgetCurrency: budgetCur,
+    budgetLimit: budgetAmount > 0 ? budgetAmount : null,
+    _styles: styles || [],
+    cities: [{ name: city, color: '#C4622D', hotel: { name: 'Hotel Central ' + city, area: 'Centro', nights: numDays, link: 'https://www.booking.com/searchresults.html?ss=' + encodeURIComponent(city), cost: numDays * hotelPerNight }, days: days }],
+    checklist: ['📄 Documentos','✈️ Passagens','🏨 Reserva hotel','💰 Dinheiro','📱 Carregadores','🧴 Protetor solar','💊 Remédios','👕 Roupas','📷 Câmera','🔌 Adaptador'],
+    mapStops: [{ name: city, lat: -22.9, lng: -43.2 }]
+  };
+}
+
+/* ══════════ GENERATE TRIP ══════════ */
+async function generateTrip() {
+  var dest = document.getElementById('wiz-destination').value.trim();
+  var dateStart = document.getElementById('wiz-date-start').value;
+  var dateEnd = document.getElementById('wiz-date-end').value;
+  var styles = [].slice.call(document.querySelectorAll('#wiz-style-chips .wiz-chip.selected')).map(function(c) { return c.dataset.style; });
+  var notes = document.getElementById('wiz-notes').value.trim();
+  if (!dest || !dateStart || !dateEnd) { alert('Preencha destino e datas.'); return; }
+  var d1 = new Date(dateStart + 'T00:00:00'), d2 = new Date(dateEnd + 'T00:00:00');
+  var numDays = Math.max(1, Math.round((d2 - d1) / 86400000) + 1);
+  hideAll(); var gen = document.getElementById('generating'); gen.classList.add('active');
+  document.getElementById('gen-dest-text').textContent = dest + ' · ' + numDays + ' dias';
+  var stepIds = ['gen-s0','gen-s1','gen-s2','gen-s3','gen-s4']; var si = 0;
+  var interval = setInterval(function() { if (si > 0) document.getElementById(stepIds[si-1]).className = 'gen-step done'; if (si < stepIds.length) { document.getElementById(stepIds[si]).className = 'gen-step active'; si++; } else clearInterval(interval); }, 800);
+  /* Try API, fallback to mock */
+  var budgetInfo = '';
+  if (budgetEnabled) { var ba = document.getElementById('wiz-budget-amount').value, bc = document.getElementById('wiz-budget-currency').value; if (ba) budgetInfo = ' Orçamento TOTAL: ' + bc + ' ' + ba + '. O custo total de TODAS atividades+hotéis DEVE ficar dentro deste valor.'; }
+  var trip = null;
+  try {
+    var prompt = "Crie roteiro para " + dest + " de " + dateStart + " a " + dateEnd + " (" + numDays + " dias). Estilos: " + (styles.length ? styles.join(', ') : 'variado') + ". " + travelers + " viajantes. " + (notes ? "Obs: " + notes : "") + budgetInfo + " IMPORTANTE: cada dia DEVE ter atividades DIFERENTES — nunca repita os mesmos eventos entre dias. Responda APENAS JSON: {tripName, country, flag (emoji bandeira), color, totalCost, budgetCurrency:BRL, cities:[{name, color, hotel:{name,area,nights,link,cost}, days:[{date,title,events:[{time,title,desc,type,cost}]}]}], checklist:[], mapStops:[{name,lat,lng}]}. Portugues BR, hoteis reais, 4-6 eventos/dia, títulos dos dias variados.";
+    var response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 16000, messages: [{ role: "user", content: prompt }] }) });
+    if (response.ok) {
+      var data = await response.json();
+      if (data.content && data.content.length) {
+        var text = data.content.map(function(c) { return c.text || ''; }).join('');
+        var clean = text.replace(/```json\s*|\s*```/g, '').trim();
+        try { trip = JSON.parse(clean); } catch(e) { try { trip = JSON.parse(repairJSON(clean)); } catch(e2) {} }
+        if (trip && (!trip.cities || !trip.cities.length)) trip = null;
+      }
+    }
+  } catch(e) { console.log('API offline, usando mock:', e.message); }
+  if (!trip) trip = generateMockTripData(dest, dateStart, dateEnd, numDays, styles);
+  clearInterval(interval); stepIds.forEach(function(id) { document.getElementById(id).className = 'gen-step done'; });
+  if (!trip.flag) trip.flag = getCountryFlag(dest);
+  if (!trip.tripName) trip.tripName = dest;
+  trip._styles = styles;
+  var tripId = editingTripId || ('trip_' + Date.now());
+  await PS.save(tripKey(tripId, 'data'), trip);
+  await PS.save(tripKey(tripId, 'checks'), {});
+  await PS.save(tripKey(tripId, 'deleted'), []);
+  await PS.save(tripKey(tripId, 'checklist'), (trip.checklist || []).map(function(t, i) { return { id: 'cl_' + i, text: t, packed: false }; }));
+  var idx = await loadTripIndex();
+  var allD = trip.cities.reduce(function(a, c) { return a.concat(c.days.map(function(d) { return d.date; })); }, []).sort();
+  var entry = { id: tripId, name: trip.tripName, flag: trip.flag, color: trip.color || '#C4622D', dateStart: allD[0] || dateStart, dateEnd: allD[allD.length - 1] || dateEnd, created: Date.now() };
+  var existIdx = -1; for (var i = 0; i < idx.length; i++) { if (idx[i].id === tripId) { existIdx = i; break; } }
+  if (existIdx !== -1) idx[existIdx] = entry; else idx.unshift(entry);
+  await saveTripIndex(idx);
+  activeTripId = tripId; editingTripId = null;
+  baseCurrency = trip.budgetCurrency || 'BRL'; displayCurrency = baseCurrency;
+  setTimeout(function() { gen.classList.remove('active'); renderApp(trip); }, 500);
+}
+
+function repairJSON(str) { str = str.replace(/,\s*$/, ''); var ob = 0, oq = 0, inS = false, esc = false; for (var i = 0; i < str.length; i++) { var c = str[i]; if (esc) { esc = false; continue; } if (c === '\\') { esc = true; continue; } if (c === '"') { inS = !inS; continue; } if (inS) continue; if (c === '{') ob++; if (c === '}') ob--; if (c === '[') oq++; if (c === ']') oq--; } if (inS) str += '"'; str = str.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"]*$/, '').replace(/,\s*$/, ''); for (var i = 0; i < oq; i++) str += ']'; for (var i = 0; i < ob; i++) str += '}'; return str; }
+
+/* ══════════ RESTYLE ══════════ */
+function toggleRestylePanel() { document.getElementById('restyle-panel').classList.toggle('open'); }
+async function restyleTrip() { var ns = [].slice.call(document.querySelectorAll('#restyle-chips .wiz-chip.selected')).map(function(c) { return c.dataset.style; }); if (!ns.length) { alert('Selecione pelo menos um estilo.'); return; } editingTripId = activeTripId; var trip = await PS.load(tripKey(activeTripId, 'data'), null); if (!trip) return; var aD = trip.cities.reduce(function(a, c) { return a.concat(c.days.map(function(d) { return d.date; })); }, []).sort(); document.getElementById('wiz-destination').value = trip.country || ''; if (aD.length) { document.getElementById('wiz-date-start').value = aD[0]; document.getElementById('wiz-date-end').value = aD[aD.length - 1]; } document.querySelectorAll('#wiz-style-chips .wiz-chip').forEach(function(c) { c.classList.remove('selected'); if (ns.indexOf(c.dataset.style) !== -1) c.classList.add('selected'); }); generateTrip(); }
+
+/* ══════════ RENDER APP ══════════ */
+function buildFlagMini(flag, tripName) {
+  var s = (tripName || '').toLowerCase();
+  if (flag === '🇮🇹' || s.indexOf('itália') !== -1 || s.indexOf('italia') !== -1) return '<span class="flag-mini" aria-label="Bandeira da Itália"><span style="background:#009246"></span><span style="background:#fff"></span><span style="background:#CE2B37"></span></span>';
+  return '<span class="flag-emoji-mini">' + (flag || '✈️') + '</span>';
+}
+function headerCountryCode(trip) {
+  var n = (trip.tripName || trip.country || '').toLowerCase();
+  if (n.indexOf('itália') !== -1 || n.indexOf('italia') !== -1) return 'IT';
+  if (n.indexOf('jap') !== -1) return 'JP';
+  if (n.indexOf('brasil') !== -1) return 'BR';
+  if (n.indexOf('portugal') !== -1) return 'PT';
+  if (n.indexOf('fran') !== -1 || n.indexOf('paris') !== -1) return 'FR';
+  if (n.indexOf('espan') !== -1) return 'ES';
+  if (n.indexOf('eua') !== -1 || n.indexOf('estados unidos') !== -1) return 'US';
+  return (trip.flag || '✈️');
+}
+function dateBadgeHTML(date, color) {
+  var d = new Date(date + 'T12:00:00');
+  var mon = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  return '<div class="date-badge" style="background:' + (color || 'var(--paper)') + '22"><div class="date-num">' + d.getDate() + '</div><div class="date-mon">' + mon[d.getMonth()] + '</div></div>';
+}
+function eventTypeClass(ev) {
+  var t = ((ev.type || '') + ' ' + (ev.title || '')).toLowerCase();
+  if (t.indexOf('hotel') !== -1 || t.indexOf('check') !== -1) return 'tag-hotel';
+  if (t.indexOf('trem') !== -1 || t.indexOf('voo') !== -1 || t.indexOf('desloc') !== -1 || t.indexOf('chegada') !== -1) return 'tag-move';
+  return 'tag-free';
+}
+function renderApp(trip) {
+  hideAll();
+  document.getElementById('app').classList.add('active');
+  var hasBudget = trip.totalCost && trip.totalCost > 0;
+  var budgetHTML = '';
+  if (hasBudget) budgetHTML = '<div class="budget-bar"><div class="budget-bar-label">Estimativa</div><div class="budget-bar-text" id="budget-text" data-cost="' + trip.totalCost + '" data-cur="' + baseCurrency + '">' + formatMoney(trip.totalCost, baseCurrency) + '</div></div>';
+  var flagBg = '<div class="flag-bg" aria-hidden="true"><span style="background:#009246"></span><span style="background:#fff"></span><span style="background:#CE2B37"></span></div>';
+  document.getElementById('app-header').setAttribute('data-code', headerCountryCode(trip));
+  document.getElementById('app-header').innerHTML = flagBg + '<div class="header-eyebrow">Viagem Inteligente</div><div class="header-title">' + trip.tripName + ' ' + buildFlagMini(trip.flag, trip.tripName) + '</div><div class="header-dates">' + formatDateRange(trip) + ' · ' + countDays(trip) + ' dias</div><div class="header-progress"><div class="progress-track"><div class="progress-fill" id="pbar"></div></div><div class="progress-text" id="ptext">0/0</div></div>' + budgetHTML + '<div class="currency-switcher"><label>Moeda:</label><select onchange="switchCurrency(this.value)">' + Object.keys(CURRENCIES).map(function(c) { return '<option value="' + c + '"' + (c === displayCurrency ? ' selected' : '') + '>' + CURRENCIES[c].s + ' ' + c + '</option>'; }).join('') + '</select></div>';
+  if (trip.mapStops && trip.mapStops.length > 1) { var rn = trip.mapStops.map(function(s) { return s.name; }).join(' → '); document.getElementById('map-route-container').innerHTML = '<button class="map-route-btn" onclick="openRoute()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="' + (trip.color || '#C4622D') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><div><div>Ver rota no Maps</div><div class="map-route-sub">' + rn + '</div></div></button>'; } else document.getElementById('map-route-container').innerHTML = '';
+  document.getElementById('restyle-container').innerHTML = '<button class="restyle-btn" onclick="toggleRestylePanel()">🔄 Recriar com outro estilo</button><div class="restyle-panel" id="restyle-panel"><div class="restyle-panel-title">Novo estilo</div><div class="restyle-panel-chips" id="restyle-chips"><button class="wiz-chip" onclick="toggleChip(this)" data-style="cultural">🏛 Cultural</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="gastro">🍽 Gastro</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="aventura">🥾 Aventura</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="relax">🧘 Relax</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="romantico">💕 Romântico</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="natureza">🌿 Natureza</button><button class="wiz-chip" onclick="toggleChip(this)" data-style="luxo">✨ Luxo</button></div><button class="restyle-go" onclick="restyleTrip()">✨ Recriar</button></div>';
+  var cc = ['#C4622D','#2D6BC4','#1D9E75','#B44D6E','#8B5CF6','#D97706'];
+  var html = '';
+  trip.cities.forEach(function(city, ci) {
+    var color = city.color || cc[ci % cc.length];
+    html += '<div class="city-section"><div class="city-label"><div class="city-dot" style="background:' + color + '"></div><div class="city-name">' + city.name + '</div><div class="city-line"></div></div>';
+    city.days.forEach(function(day, di) {
+      var g = 'c' + ci + 'd' + di;
+      var preview = day.events && day.events.length ? day.events.slice(0,2).map(function(e){return e.title;}).join(' · ') : 'Dia livre';
+      var hasMove = (day.events || []).some(function(e){ return ((e.title||'')+' '+(e.type||'')).toLowerCase().match(/trem|voo|desloc|chegada|saída|saida/); });
+      html += '<div class="day-card" id="day-' + g + '" onclick="toggleDay(this)"><div class="day-header">' + dateBadgeHTML(day.date, color) + '<div class="day-main"><div class="day-city-name">' + day.title + '</div><div class="day-preview">' + preview + '</div><div class="day-tags">' + (city.hotel ? '<span class="tag tag-hotel">🏨 Hotel</span>' : '') + (hasMove ? '<span class="tag tag-move">↔ Deslocamento</span>' : '') + '<span class="tag tag-free">' + (day.events ? day.events.length : 0) + ' atividades</span></div></div><div class="chevron">›</div></div><div class="events-panel">';
+      (day.events || []).forEach(function(ev, ei) {
+        var eid = g + 'e' + ei;
+        var mUrl = ev.title ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(ev.title + ' ' + city.name) : '';
+        var costH = ev.cost ? '<div class="event-cost" data-cost="' + ev.cost + '" data-cur="' + baseCurrency + '">' + formatMoney(convertCost(ev.cost, baseCurrency, displayCurrency), displayCurrency) + '</div>' : '';
+        html += '<div class="event-row" id="ev-' + eid + '" draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event)" ondragend="dragEnd(event)"><span class="drag-handle">⠿</span><div class="event-timeline"><div class="ev-dot" style="background:' + color + '"></div><div class="ev-line"></div></div><div class="event-content"><div class="event-time">' + (ev.time || '') + '</div><div class="event-title">' + ev.title + '</div>' + (ev.desc ? '<div class="event-desc">' + ev.desc + '</div>' : '') + costH + '<div class="event-pills">' + (mUrl ? '<a class="pill pill-maps" href="' + mUrl + '" target="_blank" onclick="event.stopPropagation()">📍 Maps</a>' : '') + '<button class="pill pill-check" data-key="' + eid + '" onclick="event.stopPropagation();toggleCheck(this)">✓ feito</button></div></div><button class="btn-remove-item" onclick="event.stopPropagation();removeItem(\'' + eid + '\')">×</button></div>';
+      });
+      html += '<div class="add-item-row" id="add-' + g + '" style="display:none"><input class="add-item-input" placeholder="Nova atividade…" onkeydown="if(event.key===\'Enter\')confirmAdd(\'' + g + '\')"/><button class="add-item-confirm" onclick="confirmAdd(\'' + g + '\')">+</button></div><button class="pill" style="margin:10px 1rem;background:var(--paper);color:var(--ink-muted);border:.5px dashed var(--border);cursor:pointer;font-family:inherit" onclick="event.stopPropagation();showAddItem(\'' + g + '\')">+ Adicionar</button></div></div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('itinerary-body').innerHTML = html;
+  var hH = ''; trip.cities.forEach(function(city, ci) { if (!city.hotel) return; var color = city.color || cc[ci % cc.length]; var costH = city.hotel.cost ? '<div class="hotel-cost" data-cost="' + city.hotel.cost + '" data-cur="' + baseCurrency + '">' + formatMoney(convertCost(city.hotel.cost, baseCurrency, displayCurrency), displayCurrency) + '</div>' : ''; hH += '<div class="hotel-card"><div class="hotel-city-strip" style="background:' + color + '">' + city.name + '</div><div class="hotel-body"><div class="hotel-name">' + city.hotel.name + '</div><div class="hotel-meta">' + (city.hotel.area || '') + ' · ' + (city.hotel.nights || '?') + ' noite' + ((city.hotel.nights || 0) !== 1 ? 's' : '') + '</div>' + costH + '<div class="hotel-links">' + (city.hotel.link ? '<a class="hotel-link" href="' + city.hotel.link + '" target="_blank">🔍 Buscar</a>' : '') + '<a class="hotel-link" href="https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(city.hotel.name + ' ' + city.name) + '" target="_blank">📍 Maps</a></div></div></div>'; });
+  document.getElementById('hotels-list').innerHTML = hH;
+  document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); }); document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); }); document.getElementById('page-itinerary').classList.add('active'); document.querySelector('.nav-item').classList.add('active'); loadState();
+}
+
+function switchCurrency(cur) { displayCurrency = cur; document.querySelectorAll('[data-cost]').forEach(function(el) { var cost = parseInt(el.dataset.cost); var from = el.dataset.cur || baseCurrency; el.textContent = formatMoney(convertCost(cost, from, cur), cur); }); }
+
+/* ══════════ STATE ══════════ */
+var checkState = {}, deletedItems = new Set(), checklistItems = [];
+async function loadState() { if (!activeTripId) return; checkState = await PS.load(tripKey(activeTripId, 'checks'), {}); var del = await PS.load(tripKey(activeTripId, 'deleted'), []); deletedItems = new Set(del); checklistItems = await PS.load(tripKey(activeTripId, 'checklist'), []); Object.entries(checkState).forEach(function(entry) { if (entry[1]) { var btn = document.querySelector('[data-key="' + entry[0] + '"]'); if (btn) { btn.classList.add('done'); var row = btn.closest('.event-row'); if (row) row.classList.add('done'); } } }); deletedItems.forEach(function(id) { var r = document.getElementById('ev-' + id); if (r) r.classList.add('deleted-hidden'); }); renderChecklist(); updateProgress(); }
+function toggleCheck(btn) { var k = btn.dataset.key; var d = btn.classList.toggle('done'); checkState[k] = d; var row = btn.closest('.event-row'); if (row) row.classList.toggle('done', d); if (activeTripId) PS.save(tripKey(activeTripId, 'checks'), checkState); updateProgress(); }
+function removeItem(id) { var r = document.getElementById('ev-' + id); if (r) r.classList.add('deleted-hidden'); deletedItems.add(id); if (activeTripId) PS.save(tripKey(activeTripId, 'deleted'), Array.from(deletedItems)); updateProgress(); }
+function updateProgress() { var all = document.querySelectorAll('.pill-check'); var t = 0, d = 0; all.forEach(function(b) { var r = b.closest('.event-row'); if (r && r.classList.contains('deleted-hidden')) return; t++; if (b.classList.contains('done')) d++; }); var pb = document.getElementById('pbar'), pt = document.getElementById('ptext'); if (pb) pb.style.width = t > 0 ? (d / t * 100) + '%' : '0%'; if (pt) pt.textContent = d + '/' + t; }
+function showAddItem(id) { var r = document.getElementById('add-' + id); r.style.display = 'flex'; r.querySelector('input').focus(); }
+function confirmAdd(id) { var r = document.getElementById('add-' + id); var inp = r.querySelector('input'); var t = inp.value.trim(); if (!t) return; var eid = id + 'e_c_' + Date.now(); var db2 = document.getElementById('day-' + id).querySelector('.day-body'); var nr = document.createElement('div'); nr.className = 'event-row'; nr.id = 'ev-' + eid; nr.innerHTML = '<span class="drag-handle">⠿</span><div class="event-time">–</div><div class="event-content"><div class="event-title">' + t + '</div><div class="event-pills"><button class="pill pill-check" data-key="' + eid + '" onclick="event.stopPropagation();toggleCheck(this)">✓ feito</button></div></div><button class="btn-remove-item" onclick="event.stopPropagation();removeItem(\'' + eid + '\')">×</button>'; db2.insertBefore(nr, r); inp.value = ''; r.style.display = 'none'; updateProgress(); }
+var draggedEl = null; function dragStart(e) { draggedEl = e.target.closest('.event-row'); if (draggedEl) { draggedEl.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; } } function dragOver(e) { e.preventDefault(); var t = e.target.closest('.event-row'); document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); }); if (t && t !== draggedEl) t.classList.add('drag-over'); } function dropItem(e) { e.preventDefault(); var t = e.target.closest('.event-row'); if (t && draggedEl && t !== draggedEl) { var p = t.parentNode; var r = t.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) p.insertBefore(draggedEl, t); else p.insertBefore(draggedEl, t.nextSibling); } document.querySelectorAll('.drag-over').forEach(function(el) { el.classList.remove('drag-over'); }); } function dragEnd() { if (draggedEl) draggedEl.classList.remove('dragging'); draggedEl = null; }
+function renderChecklist() { var c = document.getElementById('checklist-items'); if (!c) return; c.innerHTML = checklistItems.map(function(item, i) { return '<div class="checklist-item ' + (item.packed ? 'packed' : '') + '"><button class="checklist-checkbox ' + (item.packed ? 'checked' : '') + '" onclick="togglePacked(' + i + ')">' + (item.packed ? '✓' : '') + '</button><span class="checklist-text">' + item.text + '</span><button class="checklist-delete" onclick="deleteChecklistItem(' + i + ')">×</button></div>'; }).join(''); }
+function togglePacked(i) { checklistItems[i].packed = !checklistItems[i].packed; if (activeTripId) PS.save(tripKey(activeTripId, 'checklist'), checklistItems); renderChecklist(); }
+function addChecklistItem() { var t = prompt('Novo item:'); if (!t || !t.trim()) return; checklistItems.push({ id: 'cl_' + Date.now(), text: t.trim(), packed: false }); if (activeTripId) PS.save(tripKey(activeTripId, 'checklist'), checklistItems); renderChecklist(); }
+function deleteChecklistItem(i) { checklistItems.splice(i, 1); if (activeTripId) PS.save(tripKey(activeTripId, 'checklist'), checklistItems); renderChecklist(); }
+
+/* ══════════ NAV & UTILS ══════════ */
+function showPage(id) { document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); }); document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); }); document.getElementById('page-' + id).classList.add('active'); event.currentTarget.classList.add('active'); window.scrollTo(0, 0); }
+function toggleDay(card) { if (event.target.closest('a,button,input')) return; card.classList.toggle('open'); }
+function formatShortDate(s) { if (!s) return ''; var d = new Date(s + 'T12:00:00'); var m = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']; var w = ['dom','seg','ter','qua','qui','sex','sáb']; return w[d.getDay()] + ' ' + d.getDate() + ' ' + m[d.getMonth()]; }
+function formatDateRange(t) { if (!t.cities || !t.cities.length) return ''; var a = t.cities.reduce(function(acc, c) { return acc.concat(c.days.map(function(d) { return d.date; })); }, []).sort(); if (!a.length) return ''; var m = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro']; var f = new Date(a[0] + 'T12:00:00'), l = new Date(a[a.length - 1] + 'T12:00:00'); return f.getDate() + ' ' + m[f.getMonth()] + ' → ' + l.getDate() + ' ' + m[l.getMonth()]; }
+function countDays(t) { return t.cities.reduce(function(s, c) { return s + c.days.length; }, 0); }
+function openRoute() { if (!activeTripId) return; PS.load(tripKey(activeTripId, 'data'), null).then(function(t) { if (!t || !t.mapStops || t.mapStops.length < 2) return; var s = t.mapStops; var o = s[0].lat + ',' + s[0].lng; var d = s[s.length - 1].lat + ',' + s[s.length - 1].lng; var w = s.slice(1, -1).map(function(x) { return x.lat + ',' + x.lng; }).join('|'); window.open('https://www.google.com/maps/dir/?api=1&origin=' + o + '&destination=' + d + '&waypoints=' + encodeURIComponent(w) + '&travelmode=driving', '_blank'); }); }
+
+/* ══════════ INIT ══════════ */
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('login-email').addEventListener('keydown', function(e) { if (e.key === 'Enter') document.getElementById('login-pw').focus(); });
+  document.getElementById('login-pw').addEventListener('keydown', function(e) { if (e.key === 'Enter') { if (authMode === 'register') document.getElementById('login-pw2').focus(); else submitAuth(); } });
+  document.getElementById('login-pw2').addEventListener('keydown', function(e) { if (e.key === 'Enter') submitAuth(); });
+  var today = new Date(); var s = new Date(today); s.setDate(s.getDate() + 30); var e2 = new Date(s); e2.setDate(e2.getDate() + 7);
+  document.getElementById('wiz-date-start').value = s.toISOString().split('T')[0];
+  document.getElementById('wiz-date-end').value = e2.toISOString().split('T')[0];
+});
+</script>
+</body>
+</html>
