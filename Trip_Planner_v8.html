@@ -1,0 +1,2323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Trip Planner</title>
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Trip Planner">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1A1714">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+var firebaseConfig = {
+  apiKey: "AIzaSyCVkIPTs0h3e1qLeXg1CR6jSEMwAUAou9U",
+  authDomain: "trip-planner-906e6.firebaseapp.com",
+  projectId: "trip-planner-906e6",
+  storageBucket: "trip-planner-906e6.firebasestorage.app",
+  messagingSenderId: "1088738113837",
+  appId: "1:1088738113837:web:4581faf5e773b7ea84bba4"
+};
+</script>
+<style>
+/* ─── TOKENS ─────────────────────────────────────────────────── */
+:root {
+  --bg:          #F4F0E8;
+  --bg-card:     #FDFCF9;
+  --bg-dark:     #1A1714;
+  --ink:         #1A1714;
+  --ink-soft:    #4A4540;
+  --ink-muted:   #8A8480;
+  --border:      rgba(26,23,20,.09);
+  --gold:        #B8943C;
+  --gold-bg:     #F5EDD6;
+  --terra:       #C4622D;
+  --terra-bg:    #FDF0E9;
+  --green:       #1D9E75;
+  --green-bg:    #E8F7F1;
+  --blue:        #2D6BC4;
+  --blue-bg:     #E9F0FC;
+  --r:           14px;
+  --r-sm:        9px;
+  --sh:          0 2px 12px rgba(26,23,20,.07);
+  --sh-md:       0 4px 24px rgba(26,23,20,.10);
+  --sh-lg:       0 8px 40px rgba(26,23,20,.13);
+  --nav-h:       68px;
+}
+/* ─── RESET ──────────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+body { font-family:'DM Sans',-apple-system,sans-serif; background:var(--bg); color:var(--ink); min-height:100dvh; overflow-x:hidden; }
+button,input,select,textarea { font-family:inherit; }
+
+/* ─── LOADING ────────────────────────────────────────────────── */
+#loading { position:fixed; inset:0; z-index:99999; background:var(--bg-dark); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+#loading.hidden { display:none; }
+#loading p { color:rgba(255,255,255,.35); font-size:13px; }
+
+/* ─── LOGIN ──────────────────────────────────────────────────── */
+#login-screen { position:fixed; inset:0; z-index:9999; background:var(--bg-dark); display:flex; align-items:center; justify-content:center; transition:opacity .45s,transform .45s; }
+#login-screen.dismissed { opacity:0; transform:scale(1.04); pointer-events:none; }
+#login-screen.hidden { display:none; }
+
+.login-card { width:100%; max-width:340px; padding:0 1.5rem; display:flex; flex-direction:column; align-items:center; }
+.login-logo { width:64px; height:64px; border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:center; font-size:28px; margin-bottom:1.5rem; }
+.login-eyebrow { font-size:10px; letter-spacing:.15em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:6px; }
+.login-heading { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:500; color:#fff; margin-bottom:4px; }
+.login-sub { font-size:13px; color:rgba(255,255,255,.38); margin-bottom:1.75rem; text-align:center; }
+.login-field { width:100%; margin-bottom:9px; position:relative; }
+.login-input { width:100%; padding:13px 15px; border-radius:11px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.06); color:#fff; font-size:15px; outline:none; transition:border-color .2s; }
+.login-input::placeholder { color:rgba(255,255,255,.22); }
+.login-input:focus { border-color:rgba(184,148,60,.6); }
+.login-input.shake { border-color:var(--terra); animation:shake .38s; }
+@keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
+.login-pw-toggle { position:absolute; right:3px; top:50%; transform:translateY(-50%); background:none; border:none; color:rgba(255,255,255,.3); font-size:17px; padding:10px 12px; cursor:pointer; }
+.login-error { font-size:12px; color:#E8694A; text-align:center; min-height:18px; margin-bottom:5px; }
+.login-primary-btn { width:100%; padding:14px; border-radius:11px; border:none; background:var(--gold); color:var(--ink); font-size:15px; font-weight:600; cursor:pointer; transition:opacity .15s,transform .1s; margin-bottom:10px; }
+.login-primary-btn:active { transform:scale(.98); }
+.login-primary-btn:disabled { opacity:.35; }
+.login-switch { font-size:13px; color:rgba(255,255,255,.38); text-align:center; }
+.login-switch a { color:var(--gold); text-decoration:none; font-weight:500; cursor:pointer; }
+
+/* ─── LOGOUT BUTTON ──────────────────────────────────────────── */
+.logout-btn { position:fixed; top:calc(10px + env(safe-area-inset-top,0px)); right:12px; z-index:1200; background:var(--bg-card); border:1px solid var(--border); border-radius:999px; padding:7px 13px; font-size:11px; font-weight:500; color:var(--ink-muted); cursor:pointer; display:none; align-items:center; gap:5px; box-shadow:var(--sh); max-width:46vw; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.logout-btn.visible { display:flex; }
+
+/* ─── SPINNER ────────────────────────────────────────────────── */
+.spinner { width:40px; height:40px; border:2.5px solid rgba(255,255,255,.1); border-top-color:var(--gold); border-radius:50%; animation:spin .85s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ─── WIZARD ─────────────────────────────────────────────────── */
+#wizard { min-height:100dvh; display:flex; flex-direction:column; }
+#wizard.hidden { display:none; }
+
+.wiz-topbar { position:fixed; top:0; left:0; right:0; z-index:100; padding:env(safe-area-inset-top,0px) 0 0; background:rgba(244,240,232,.94); backdrop-filter:blur(14px); }
+.wiz-topbar-inner { padding:14px 20px 12px; display:flex; align-items:center; gap:12px; }
+.wiz-step-label { font-size:11px; color:var(--ink-muted); font-weight:500; white-space:nowrap; }
+.wiz-track { flex:1; height:3px; background:rgba(26,23,20,.1); border-radius:3px; overflow:hidden; }
+.wiz-fill { height:100%; background:var(--gold); border-radius:3px; transition:width .4s ease; }
+
+.wiz-page { display:none; flex-direction:column; padding:88px 24px calc(90px + env(safe-area-inset-bottom,0px)); animation:fadeUp .35s ease; }
+.wiz-page.active { display:flex; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+
+.wiz-eyebrow { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:8px; }
+.wiz-title { font-family:'Cormorant Garamond',serif; font-size:34px; font-weight:500; line-height:1.12; margin-bottom:6px; }
+.wiz-sub { font-size:14px; color:var(--ink-muted); margin-bottom:28px; line-height:1.5; }
+
+.wiz-label { font-size:11px; font-weight:600; color:var(--ink-soft); letter-spacing:.02em; display:block; margin-bottom:6px; }
+.wiz-group { margin-bottom:18px; }
+.wiz-input { width:100%; padding:15px 16px; border-radius:var(--r); border:1.5px solid rgba(26,23,20,.13); background:var(--bg-card); font-size:15px; color:var(--ink); outline:none; transition:border-color .2s; -webkit-appearance:none; }
+.wiz-input:focus { border-color:var(--gold); }
+.wiz-input::placeholder { color:rgba(26,23,20,.28); }
+
+.wiz-date-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
+
+.wiz-stepper { display:flex; align-items:center; gap:18px; }
+.wiz-stepper-btn { width:44px; height:44px; border-radius:50%; border:1.5px solid var(--border); background:var(--bg-card); font-size:22px; color:var(--ink); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:background .15s; }
+.wiz-stepper-btn:active { background:var(--bg); }
+.wiz-stepper-val { font-family:'Cormorant Garamond',serif; font-size:38px; font-weight:500; min-width:40px; text-align:center; }
+
+.wiz-chips { display:flex; flex-wrap:wrap; gap:9px; }
+.wiz-chip { padding:11px 16px; border-radius:999px; border:1.5px solid rgba(26,23,20,.12); background:var(--bg-card); font-size:13.5px; font-weight:500; color:var(--ink-soft); cursor:pointer; transition:all .18s; }
+.wiz-chip.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+
+.wiz-budget-toggle { display:flex; gap:9px; margin-bottom:16px; }
+.wiz-budget-toggle button { flex:1; padding:13px; border-radius:var(--r); border:1.5px solid rgba(26,23,20,.12); background:var(--bg-card); font-size:14px; font-weight:500; color:var(--ink-soft); cursor:pointer; transition:all .18s; }
+.wiz-budget-toggle button.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+.wiz-budget-row { display:grid; grid-template-columns:110px 1fr; gap:10px; margin-bottom:14px; }
+.wiz-budget-row select,.wiz-budget-row input { padding:14px 12px; border-radius:var(--r); border:1.5px solid rgba(26,23,20,.12); background:var(--bg-card); font-size:14px; color:var(--ink); outline:none; -webkit-appearance:none; }
+.wiz-presets { display:flex; flex-wrap:wrap; gap:8px; }
+
+/* ─── DESTINATION LIST ──────────────────────────────────────── */
+.dest-item { background:var(--bg-card); border:1.5px solid rgba(26,23,20,.1); border-radius:var(--r); padding:14px 14px 12px; margin-bottom:10px; position:relative; animation:fadeUp .25s ease; }
+.dest-item-header { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.dest-item-flag { font-size:22px; flex-shrink:0; }
+.dest-item-name { flex:1; font-size:15px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dest-remove-btn { width:30px; height:30px; border-radius:50%; border:1px solid rgba(26,23,20,.1); background:none; color:var(--ink-muted); font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; flex-shrink:0; }
+.dest-remove-btn:hover { background:var(--terra-bg); color:var(--terra); border-color:var(--terra); }
+.dest-search-wrap { position:relative; margin-bottom:8px; }
+.dest-search-input { width:100%; padding:12px 14px; border-radius:10px; border:1.5px solid rgba(26,23,20,.13); background:var(--bg); font-size:14px; color:var(--ink); outline:none; transition:border-color .2s; }
+.dest-search-input:focus { border-color:var(--gold); }
+.dest-search-input::placeholder { color:rgba(26,23,20,.28); }
+.dest-dropdown { position:absolute; top:100%; left:0; right:0; z-index:200; max-height:220px; overflow-y:auto; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; box-shadow:var(--sh-md); margin-top:4px; display:none; }
+.dest-dropdown.open { display:block; }
+.dest-dropdown-item { padding:11px 14px; font-size:14px; cursor:pointer; display:flex; align-items:center; gap:9px; transition:background .1s; border-bottom:.5px solid var(--border); }
+.dest-dropdown-item:last-child { border-bottom:none; }
+.dest-dropdown-item:hover, .dest-dropdown-item.highlighted { background:var(--gold-bg); }
+.dest-dropdown-item .dd-flag { font-size:18px; flex-shrink:0; }
+.dest-dropdown-item .dd-name { font-weight:500; }
+.dest-dropdown-item .dd-type { font-size:11px; color:var(--ink-muted); margin-left:auto; }
+.dest-selected { display:none; }
+.dest-item.has-selection .dest-search-wrap { display:none; }
+.dest-item.has-selection .dest-selected { display:flex; align-items:center; gap:8px; }
+.dest-days-row { display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:.5px solid var(--border); }
+.dest-days-label { font-size:12px; color:var(--ink-muted); font-weight:500; flex-shrink:0; }
+.dest-days-toggle { display:flex; gap:6px; }
+.dest-days-toggle button { padding:7px 12px; border-radius:8px; border:1px solid rgba(26,23,20,.1); background:var(--bg); font-size:12px; font-weight:500; color:var(--ink-soft); cursor:pointer; transition:all .15s; }
+.dest-days-toggle button.selected { background:var(--ink); color:#fff; border-color:var(--ink); }
+.dest-days-input { width:60px; padding:7px 10px; border-radius:8px; border:1px solid rgba(26,23,20,.13); background:var(--bg); font-size:14px; color:var(--ink); outline:none; text-align:center; display:none; }
+.dest-days-input.visible { display:block; }
+.dest-add-btn { width:100%; padding:13px; border-radius:var(--r); border:1.5px dashed rgba(26,23,20,.18); background:none; font-size:14px; font-weight:500; color:var(--ink-muted); cursor:pointer; transition:all .2s; margin-top:4px; }
+.dest-add-btn:hover { border-color:var(--gold); color:var(--gold); background:var(--gold-bg); }
+.wiz-preset-btn { padding:8px 13px; border-radius:999px; border:1.5px solid rgba(26,23,20,.12); background:var(--bg-card); font-size:12px; font-weight:500; color:var(--ink-muted); cursor:pointer; transition:all .18s; }
+.wiz-preset-btn.selected { background:var(--gold-bg); color:var(--terra); border-color:var(--gold); }
+
+.wiz-bottom { position:fixed; bottom:0; left:0; right:0; padding:10px 16px calc(10px + env(safe-area-inset-bottom,6px)); background:rgba(244,240,232,.94); backdrop-filter:blur(14px); display:flex; gap:10px; z-index:100; border-top:.5px solid var(--border); }
+.wiz-btn { flex:1; padding:15px; border-radius:var(--r); border:none; font-size:15px; font-weight:600; cursor:pointer; transition:all .15s; }
+.wiz-btn:active { transform:scale(.98); }
+.wiz-btn-primary { background:var(--ink); color:#fff; }
+.wiz-btn-primary:disabled { opacity:.3; }
+.wiz-btn-back { flex:0 0 auto; padding:15px 18px; background:var(--bg-card); color:var(--ink); border:1.5px solid var(--border); }
+
+/* ─── GENERATING ─────────────────────────────────────────────── */
+#generating { position:fixed; inset:0; z-index:9999; background:var(--bg-dark); display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; padding:24px; }
+#generating.active { display:flex; }
+.gen-title { font-family:'Cormorant Garamond',serif; font-size:26px; color:#fff; text-align:center; }
+.gen-sub { font-size:13px; color:rgba(255,255,255,.38); text-align:center; max-width:240px; line-height:1.55; }
+.gen-steps { display:flex; flex-direction:column; gap:9px; margin-top:6px; }
+.gen-step { font-size:12px; color:rgba(255,255,255,.22); display:flex; align-items:center; gap:9px; transition:color .3s; }
+.gen-step.active { color:var(--gold); }
+.gen-step.done { color:rgba(255,255,255,.45); }
+.gen-dot { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+
+/* ─── TRIPS SCREEN ───────────────────────────────────────────── */
+#trips-screen { display:none; min-height:100dvh; }
+#trips-screen.active { display:block; }
+
+.trips-header { padding:calc(3.5rem + env(safe-area-inset-top,0px)) 1.25rem 1rem; }
+.trips-header-row { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
+.trips-title { font-family:'Cormorant Garamond',serif; font-size:30px; font-weight:500; min-width:0; }
+.trips-new-btn { padding:10px 18px; border-radius:999px; border:none; background:var(--ink); color:#fff; font-size:13px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:5px; flex-shrink:0; transition:opacity .15s; }
+.trips-new-btn:active { opacity:.75; }
+.trips-subtitle { font-size:12px; color:var(--ink-muted); }
+
+.trips-map-box { margin:0 1.25rem .75rem; border-radius:18px; overflow:hidden; border:1px solid var(--border); box-shadow:var(--sh-md); height:240px; background:#EEF4F4; }
+.trips-map-real { width:100%; height:100%; }
+.trips-map-empty { display:flex; align-items:center; justify-content:center; height:100%; color:var(--ink-muted); font-size:13px; flex-direction:column; gap:7px; opacity:.55; }
+.trips-map-empty span:first-child { font-size:34px; opacity:.5; }
+
+.continent-chips { display:flex; flex-wrap:wrap; gap:6px; padding:0 1.25rem .75rem; }
+.continent-chip { font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:5px 10px; border-radius:999px; border:1px solid rgba(26,23,20,.07); color:rgba(26,23,20,.52); }
+.continent-chip.europe  { background:#EAF0FF; }
+.continent-chip.america { background:#EAF7F0; }
+.continent-chip.asia    { background:#FFF4E8; }
+.continent-chip.africa  { background:#F5EBD9; }
+.continent-chip.oceania { background:#F2EAF8; }
+
+.trips-list { padding:0 1.25rem 2rem; display:flex; flex-direction:column; gap:10px; }
+.trip-card { background:var(--bg-card); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); overflow:hidden; cursor:pointer; transition:box-shadow .2s,transform .1s; }
+.trip-card:active { transform:scale(.987); }
+.trip-card-accent { height:5px; }
+.trip-card-body { padding:1rem 1.125rem; display:flex; align-items:center; gap:13px; }
+.trip-card-flag { font-size:30px; flex-shrink:0; }
+.trip-card-info { flex:1; min-width:0; }
+.trip-card-name { font-family:'Cormorant Garamond',serif; font-size:20px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.trip-card-meta { font-size:11px; color:var(--ink-muted); margin-top:2px; }
+.trip-card-right { text-align:right; flex-shrink:0; }
+.trip-card-pct { font-size:17px; font-weight:700; }
+.trip-card-pct-label { font-size:10px; color:var(--ink-muted); }
+.trip-card-actions { display:flex; border-top:.5px solid var(--bg); }
+.trip-card-action { flex:1; padding:9px; border:none; background:none; font-size:12px; font-weight:500; color:var(--ink-muted); cursor:pointer; transition:background .15s,color .15s; }
+.trip-card-action:hover { background:var(--bg); }
+.trip-card-action.danger:hover { color:var(--terra); }
+.trip-card-action + .trip-card-action { border-left:.5px solid var(--bg); }
+.trips-empty { text-align:center; padding:3rem 2rem; color:var(--ink-muted); }
+.trips-empty-icon { font-size:44px; margin-bottom:14px; opacity:.35; }
+.trips-empty-title { font-size:15px; font-weight:600; color:var(--ink-soft); margin-bottom:5px; }
+.trips-empty-sub { font-size:13px; line-height:1.5; }
+
+/* pin styles for leaflet */
+.tp-pin { width:26px; height:26px; border-radius:50%; background:rgba(196,98,45,.14); display:flex; align-items:center; justify-content:center; }
+.tp-pin::before { content:""; width:11px; height:11px; border-radius:50%; background:var(--terra); border:2px solid #fff; box-shadow:0 2px 8px rgba(26,23,20,.25); }
+.tp-pin-pulse { width:26px; height:26px; border-radius:50%; background:rgba(196,98,45,.14); animation:pinPulse 2.2s ease-out infinite; }
+@keyframes pinPulse { 0%{transform:scale(.7);opacity:.5} 100%{transform:scale(1.9);opacity:0} }
+.tp-pin-label { color:rgba(26,23,20,.65); font-size:10px; font-weight:700; text-shadow:0 1px 0 rgba(255,255,255,.95),0 0 7px rgba(255,255,255,.85); white-space:nowrap; pointer-events:none; }
+.tp-cont-label { color:rgba(26,23,20,.38); font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; text-shadow:0 1px 0 rgba(255,255,255,.9),0 0 6px rgba(255,255,255,.8); white-space:nowrap; pointer-events:none; }
+
+/* ─── APP ────────────────────────────────────────────────────── */
+#app { display:none; }
+#app.active { display:block; }
+
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:rgba(253,252,249,.92); backdrop-filter:blur(14px); display:flex; justify-content:space-around; padding:6px 0 calc(6px + env(safe-area-inset-bottom,8px)); border-top:.5px solid var(--border); z-index:1000; }
+.nav-item { display:flex; flex-direction:column; align-items:center; font-size:10px; font-weight:500; color:var(--ink-muted); cursor:pointer; padding:4px 14px; border:none; background:none; gap:2px; }
+.nav-item.active { color:var(--ink); }
+.nav-icon { font-size:21px; }
+
+.page { display:none; padding-bottom:var(--nav-h); }
+.page.active { display:block; }
+
+/* ─── TRIP DETAIL HEADER ─────────────────────────────────────── */
+.back-btn { display:inline-flex; align-items:center; gap:5px; padding:8px 14px; margin:0 1rem; border:none; background:none; font-size:13px; font-weight:500; color:var(--ink-muted); cursor:pointer; }
+.trip-header { background:var(--bg-dark); color:#fff; padding:3rem 1.25rem 1.5rem; position:relative; overflow:hidden; }
+.trip-header-bg { position:absolute; inset:0; opacity:.07; pointer-events:none; display:flex; }
+.trip-header-bg span { flex:1; display:block; }
+.trip-header-bg-text { position:absolute; right:-10px; top:50%; transform:translateY(-50%); font-family:'Cormorant Garamond',serif; font-size:110px; font-weight:600; color:rgba(255,255,255,.04); letter-spacing:-4px; pointer-events:none; z-index:0; white-space:nowrap; }
+.trip-header-inner { position:relative; z-index:1; }
+.trip-header-eyebrow { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:6px; }
+.trip-header-title { font-family:'Cormorant Garamond',serif; font-size:36px; font-weight:500; line-height:1.1; }
+.trip-header-dates { font-size:13px; color:rgba(255,255,255,.45); margin-top:5px; }
+.trip-header-progress { display:flex; align-items:center; gap:10px; margin-top:1.25rem; }
+.progress-track { flex:1; height:3px; background:rgba(255,255,255,.12); border-radius:3px; overflow:hidden; }
+.progress-fill { height:100%; background:var(--gold); border-radius:3px; transition:width .5s; width:0%; }
+.progress-text { font-size:11px; color:rgba(255,255,255,.38); font-weight:500; }
+.budget-pill { display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:7px 12px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1); border-radius:9px; font-size:11px; color:rgba(255,255,255,.6); }
+.budget-pill strong { color:rgba(255,255,255,.85); }
+.currency-row { display:flex; align-items:center; gap:7px; margin-top:8px; }
+.currency-row label { font-size:11px; color:rgba(255,255,255,.4); }
+.currency-row select { padding:4px 8px; border-radius:6px; border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.07); font-size:12px; color:rgba(255,255,255,.75); outline:none; cursor:pointer; }
+.map-route-link { display:flex; align-items:center; gap:10px; margin:12px 1.25rem 0; padding:11px 15px; border-radius:var(--r); border:1px solid var(--border); background:var(--bg-card); font-size:13px; font-weight:600; cursor:pointer; box-shadow:var(--sh); text-decoration:none; color:var(--ink); }
+.map-route-link-sub { font-size:11px; color:var(--ink-muted); font-weight:400; margin-top:1px; }
+.restyle-row { margin:10px 1.25rem 0; }
+.restyle-toggle-btn { display:flex; align-items:center; gap:7px; padding:9px 15px; border-radius:var(--r); border:1.5px dashed rgba(26,23,20,.15); background:none; font-size:12px; font-weight:500; color:var(--ink-muted); cursor:pointer; transition:all .2s; }
+.restyle-toggle-btn:hover { border-color:var(--terra); color:var(--terra); }
+.restyle-panel { background:var(--bg-card); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); padding:14px; margin-top:8px; display:none; }
+.restyle-panel.open { display:block; }
+.restyle-panel-title { font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:10px; }
+.restyle-go-btn { margin-top:12px; padding:10px 18px; border-radius:var(--r-sm); border:none; background:var(--ink); color:#fff; font-size:13px; font-weight:600; cursor:pointer; }
+
+/* ─── CITY SECTION ───────────────────────────────────────────── */
+.city-section { margin-top:1.5rem; }
+.city-label { display:flex; align-items:center; gap:9px; padding:0 1.25rem .5rem; }
+.city-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+.city-name-label { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-muted); font-weight:600; }
+.city-divider { flex:1; height:.5px; background:var(--border); }
+
+/* ─── DAY CARD ───────────────────────────────────────────────── */
+.day-card { background:var(--bg-card); margin:0 1rem .625rem; border-radius:var(--r); border:.5px solid var(--border); box-shadow:var(--sh); transition:box-shadow .2s; overflow:hidden; }
+.day-card.open { box-shadow:var(--sh-md); }
+.day-header { display:flex; align-items:center; gap:12px; padding:.875rem 1rem; cursor:pointer; user-select:none; }
+.date-badge { width:46px; height:52px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; flex-shrink:0; }
+.date-num { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:600; line-height:1; }
+.date-mon { font-size:9px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; margin-top:1px; opacity:.7; }
+.day-main { flex:1; min-width:0; }
+.day-title { font-size:14px; font-weight:500; }
+.day-preview { font-size:12px; color:var(--ink-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.day-tags { display:flex; gap:5px; margin-top:5px; flex-wrap:wrap; }
+.tag { font-size:9.5px; padding:2px 7px; border-radius:999px; font-weight:600; }
+.tag-hotel { background:var(--blue-bg); color:var(--blue); }
+.tag-move { background:var(--gold-bg); color:var(--gold); }
+.tag-count { background:rgba(26,23,20,.07); color:var(--ink-soft); }
+.day-chevron { width:22px; height:22px; border-radius:50%; background:var(--bg); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:12px; color:var(--ink-muted); transition:transform .25s,background .2s; }
+.day-card.open .day-chevron { transform:rotate(90deg); background:var(--ink); color:#fff; }
+
+.events-panel { display:none; border-top:.5px solid var(--border); background:var(--bg); }
+.day-card.open .events-panel { display:block; }
+
+/* ─── EVENT ROW ──────────────────────────────────────────────── */
+.event-row { display:flex; gap:10px; padding:.75rem 1rem; border-bottom:.5px solid var(--border); position:relative; transition:background .15s; background:var(--bg-card); }
+.event-row:last-of-type { border-bottom:none; }
+.event-row.done { opacity:.48; }
+.event-row.done .event-title { text-decoration:line-through; }
+.event-row.deleted-hidden { max-height:0; opacity:0; overflow:hidden; padding:0; border:none; transition:all .28s; }
+.ev-timeline { display:flex; flex-direction:column; align-items:center; width:12px; padding-top:5px; flex-shrink:0; }
+.ev-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+.ev-line { width:1.5px; flex:1; min-height:14px; margin-top:3px; background:var(--border); }
+.event-content { flex:1; min-width:0; }
+.event-time { font-size:11px; color:var(--ink-muted); margin-bottom:2px; font-weight:400; }
+.event-title { font-size:13.5px; font-weight:500; line-height:1.3; }
+.event-desc { font-size:12px; color:var(--ink-soft); margin-top:2px; line-height:1.45; }
+.event-location { font-size:11px; color:var(--green); margin-top:3px; font-weight:500; }
+.event-cost { font-size:11px; color:var(--terra); font-weight:500; margin-top:3px; }
+.event-pills { display:flex; gap:5px; margin-top:7px; flex-wrap:wrap; }
+.pill { font-size:10px; padding:4px 9px; border-radius:999px; font-weight:500; text-decoration:none; display:inline-flex; align-items:center; gap:4px; cursor:pointer; border:none; outline:none; }
+.pill-maps { background:var(--blue-bg); color:var(--blue); }
+.pill-check { background:rgba(26,23,20,.06); color:var(--ink-soft); border:.5px solid var(--border); }
+.pill-check.done { background:var(--green-bg); color:var(--green); border-color:transparent; }
+.btn-remove { position:absolute; right:10px; top:10px; background:none; border:none; font-size:16px; color:var(--ink-muted); opacity:0; cursor:pointer; padding:3px 5px; transition:opacity .2s; }
+.event-row:hover .btn-remove { opacity:.45; }
+.drag-handle { color:rgba(26,23,20,.2); cursor:grab; font-size:14px; padding:2px 3px; user-select:none; flex-shrink:0; margin-top:3px; }
+.event-row.dragging { opacity:.35; background:var(--gold-bg); }
+.event-row.drag-over { border-top:2px solid var(--gold); }
+
+/* ─── ADD ITEM ───────────────────────────────────────────────── */
+.add-row { padding:.625rem 1rem; border-top:.5px solid var(--border); background:var(--bg); }
+.add-toggle-btn { width:100%; border:.5px dashed rgba(26,23,20,.15); background:none; color:var(--ink-muted); border-radius:var(--r-sm); padding:10px 12px; text-align:left; font-size:12.5px; cursor:pointer; }
+.add-form { display:none; flex-direction:column; gap:8px; }
+.add-row.open .add-toggle-btn { display:none; }
+.add-row.open .add-form { display:flex; }
+.add-field { border:.5px solid rgba(26,23,20,.13); background:var(--bg-card); border-radius:var(--r-sm); padding:10px 11px; font-size:13px; color:var(--ink); outline:none; width:100%; }
+.add-field:focus { border-color:var(--gold); }
+.add-form-row { display:flex; gap:8px; }
+.add-save-btn { background:var(--ink); color:#fff; border:none; border-radius:var(--r-sm); padding:10px 16px; font-size:13px; font-weight:600; cursor:pointer; }
+.add-cancel-btn { background:var(--bg-card); color:var(--ink-muted); border:.5px solid var(--border); border-radius:var(--r-sm); padding:10px 13px; font-size:13px; cursor:pointer; }
+
+/* AI suggestions inside add row */
+.add-ai-btn { width:100%; border:.5px solid var(--gold); background:linear-gradient(135deg,var(--gold-bg),#FFF9EC); color:var(--gold); border-radius:var(--r-sm); padding:9px 12px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.ai-cards { display:none; }
+.ai-cards.open { display:block; }
+.ai-card { background:var(--bg-card); border:.5px solid var(--border); border-radius:10px; padding:10px; margin-top:7px; cursor:pointer; }
+.ai-card:hover { border-color:var(--gold); }
+.ai-card-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+.ai-card-title { font-size:13px; font-weight:600; }
+.ai-card-time { font-size:11px; color:var(--ink-muted); background:var(--bg); border-radius:999px; padding:3px 8px; white-space:nowrap; }
+.ai-card-desc { font-size:12px; color:var(--ink-soft); margin-top:3px; line-height:1.4; }
+.ai-card-hint { font-size:10px; color:var(--gold); font-weight:600; margin-top:5px; }
+
+/* ─── HOTELS ─────────────────────────────────────────────────── */
+.hotels-wrap { padding:1.25rem; }
+.hotel-card { background:var(--bg-card); border-radius:var(--r); border:1px solid var(--border); box-shadow:var(--sh); overflow:hidden; margin-bottom:12px; }
+.hotel-strip { padding:6px 12px; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:#fff; }
+.hotel-body { padding:.875rem 1rem; }
+.hotel-name { font-family:'Cormorant Garamond',serif; font-size:19px; font-weight:500; }
+.hotel-meta { font-size:12px; color:var(--ink-muted); margin-top:3px; }
+.hotel-cost { font-size:12px; color:var(--terra); font-weight:500; margin-top:4px; }
+.hotel-links { display:flex; gap:8px; margin-top:9px; }
+.hotel-link { font-size:11px; padding:5px 11px; border-radius:999px; text-decoration:none; font-weight:500; background:var(--blue-bg); color:var(--blue); }
+
+/* ─── CHECKLIST ──────────────────────────────────────────────── */
+.checklist-wrap { padding:1.25rem; }
+.checklist-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.checklist-title { font-family:'Cormorant Garamond',serif; font-size:24px; font-weight:500; }
+.checklist-add-btn { padding:8px 14px; border-radius:999px; border:1.5px solid var(--border); background:var(--bg-card); font-size:13px; font-weight:500; cursor:pointer; }
+.checklist-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:.5px solid var(--border); }
+.checklist-cb { width:22px; height:22px; border-radius:6px; border:1.5px solid rgba(26,23,20,.18); background:var(--bg-card); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0; font-size:12px; color:transparent; transition:all .15s; }
+.checklist-cb.checked { background:var(--green); border-color:var(--green); color:#fff; }
+.checklist-text { font-size:14px; flex:1; }
+.checklist-item.packed .checklist-text { text-decoration:line-through; opacity:.45; }
+.checklist-del { background:none; border:none; font-size:15px; color:var(--ink-muted); opacity:0; cursor:pointer; padding:4px; }
+.checklist-item:hover .checklist-del { opacity:.45; }
+
+/* ─── MISC ───────────────────────────────────────────────────── */
+.page-section-header { padding:1.25rem 1.25rem .75rem; }
+.page-section-eyebrow { font-size:10px; letter-spacing:.13em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:4px; }
+.page-section-title { font-family:'Cormorant Garamond',serif; font-size:26px; font-weight:500; }
+body.locked #app,body.locked #trips-screen,body.locked #wizard,body.locked .logout-btn { visibility:hidden; }
+@media (max-width:380px) { .trips-title{font-size:26px} }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading"><div class="spinner"></div><p>Carregando…</p></div>
+
+<!-- Login -->
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <div class="login-logo">✈️</div>
+    <div class="login-eyebrow">Trip Planner</div>
+    <div class="login-heading" id="login-title">Bem-vindo</div>
+    <div class="login-sub" id="login-subtitle">Entre para acessar seus roteiros</div>
+    <div class="login-error" id="login-error">&nbsp;</div>
+    <div class="login-field">
+      <input class="login-input" id="login-email" type="email" placeholder="E-mail" autocomplete="email">
+    </div>
+    <div class="login-field" id="login-pw-field">
+      <input class="login-input" id="login-pw" type="password" placeholder="Senha" autocomplete="current-password">
+      <button class="login-pw-toggle" id="pw-toggle-btn">👁</button>
+    </div>
+    <div class="login-field" id="login-pw2-field" style="display:none">
+      <input class="login-input" id="login-pw2" type="password" placeholder="Confirmar senha" autocomplete="new-password">
+    </div>
+    <button class="login-primary-btn" id="login-btn">Entrar</button>
+    <div class="login-switch" id="login-switch">Não tem conta? <a id="switch-mode-link">Criar conta</a></div>
+  </div>
+</div>
+
+<!-- Logout button -->
+<button class="logout-btn" id="logout-btn">👤 <span id="logout-user"></span> · Sair</button>
+
+<!-- Wizard -->
+<div id="wizard" class="hidden">
+  <div class="wiz-topbar">
+    <div class="wiz-topbar-inner">
+      <span class="wiz-step-label" id="wiz-step-label">Passo 1 de 5</span>
+      <div class="wiz-track"><div class="wiz-fill" id="wiz-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Step 0: Destination -->
+  <div class="wiz-page active" id="wpage-0">
+    <div class="wiz-eyebrow">Destinos</div>
+    <div class="wiz-title">Para onde<br>você vai?</div>
+    <div class="wiz-sub">Adicione países ou cidades. A busca será feita online.</div>
+    <div id="dest-list"></div>
+    <button class="dest-add-btn" id="dest-add-btn" type="button">+ Adicionar destino</button>
+    <!-- hidden input to pass validation -->
+    <input type="hidden" id="wiz-destination" value="">
+  </div>
+
+  <!-- Step 1: Dates & travelers -->
+  <div class="wiz-page" id="wpage-1">
+    <div class="wiz-eyebrow">Quando</div>
+    <div class="wiz-title">Datas e<br>viajantes</div>
+    <div class="wiz-sub">Selecione o período da viagem.</div>
+    <div class="wiz-date-grid">
+      <div class="wiz-group">
+        <label class="wiz-label">Ida</label>
+        <input type="date" class="wiz-input" id="wiz-date-start">
+      </div>
+      <div class="wiz-group">
+        <label class="wiz-label">Volta</label>
+        <input type="date" class="wiz-input" id="wiz-date-end">
+      </div>
+    </div>
+    <div class="wiz-group">
+      <label class="wiz-label">Viajantes</label>
+      <div class="wiz-stepper">
+        <button class="wiz-stepper-btn" id="trav-minus">−</button>
+        <div class="wiz-stepper-val" id="wiz-travelers">2</div>
+        <button class="wiz-stepper-btn" id="trav-plus">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Style -->
+  <div class="wiz-page" id="wpage-2">
+    <div class="wiz-eyebrow">Estilo</div>
+    <div class="wiz-title">Como você<br>gosta de viajar?</div>
+    <div class="wiz-sub">Selecione um ou mais estilos.</div>
+    <div class="wiz-chips" id="wiz-style-chips">
+      <button class="wiz-chip" data-style="cultural">🏛 Cultural</button>
+      <button class="wiz-chip" data-style="gastro">🍽 Gastronômico</button>
+      <button class="wiz-chip" data-style="aventura">🥾 Aventura</button>
+      <button class="wiz-chip" data-style="relax">🧘 Relaxamento</button>
+      <button class="wiz-chip" data-style="romantico">💕 Romântico</button>
+      <button class="wiz-chip" data-style="familia">👨‍👩‍👧 Família</button>
+      <button class="wiz-chip" data-style="nightlife">🎶 Vida Noturna</button>
+      <button class="wiz-chip" data-style="natureza">🌿 Natureza</button>
+      <button class="wiz-chip" data-style="compras">🛍 Compras</button>
+      <button class="wiz-chip" data-style="luxo">✨ Luxo</button>
+      <button class="wiz-chip" data-style="mochilao">🎒 Mochilão</button>
+      <button class="wiz-chip" data-style="fotografia">📸 Fotografia</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Budget -->
+  <div class="wiz-page" id="wpage-3">
+    <div class="wiz-eyebrow">Orçamento</div>
+    <div class="wiz-title">Tem um<br>orçamento?</div>
+    <div class="wiz-sub">Opcional — ajuda a calibrar as sugestões.</div>
+    <div class="wiz-budget-toggle">
+      <button class="selected" id="budget-no-btn">Sem limite</button>
+      <button id="budget-yes-btn">Definir valor</button>
+    </div>
+    <div id="budget-fields" style="display:none">
+      <div class="wiz-budget-row">
+        <select id="wiz-budget-currency">
+          <option value="BRL">R$ BRL</option>
+          <option value="USD">$ USD</option>
+          <option value="EUR">€ EUR</option>
+          <option value="GBP">£ GBP</option>
+          <option value="JPY">¥ JPY</option>
+        </select>
+        <input type="number" class="wiz-input" id="wiz-budget-amount" placeholder="Valor total" style="padding:14px">
+      </div>
+      <div class="wiz-presets">
+        <button class="wiz-preset-btn" data-preset="economico">🎒 Econômico</button>
+        <button class="wiz-preset-btn" data-preset="moderado">☕ Moderado</button>
+        <button class="wiz-preset-btn" data-preset="confortavel">🛋 Confortável</button>
+        <button class="wiz-preset-btn" data-preset="luxo">💎 Luxo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Notes -->
+  <div class="wiz-page" id="wpage-4">
+    <div class="wiz-eyebrow">Detalhes</div>
+    <div class="wiz-title">Algo mais<br>que devo saber?</div>
+    <div class="wiz-sub">Restrições, acessibilidade, pedidos especiais.</div>
+    <div class="wiz-group">
+      <textarea class="wiz-input" id="wiz-notes" placeholder="Ex: Sou vegetariano, viajo com criança de 3 anos…" rows="4" style="resize:none"></textarea>
+    </div>
+  </div>
+
+  <div class="wiz-bottom">
+    <button class="wiz-btn wiz-btn-back" id="wiz-back-btn">←</button>
+    <button class="wiz-btn wiz-btn-primary" id="wiz-next-btn">Continuar</button>
+  </div>
+</div>
+
+<!-- Generating -->
+<div id="generating">
+  <div class="spinner"></div>
+  <div class="gen-title">Criando seu roteiro</div>
+  <div class="gen-sub" id="gen-dest-text"></div>
+  <div class="gen-steps">
+    <div class="gen-step" id="gen-s0"><div class="gen-dot"></div> Pesquisando destino</div>
+    <div class="gen-step" id="gen-s1"><div class="gen-dot"></div> Gerando dias do roteiro</div>
+    <div class="gen-step" id="gen-s2"><div class="gen-dot"></div> Buscando restaurantes</div>
+    <div class="gen-step" id="gen-s3"><div class="gen-dot"></div> Adicionando atrações</div>
+    <div class="gen-step" id="gen-s4"><div class="gen-dot"></div> Finalizando roteiro</div>
+  </div>
+</div>
+
+<!-- Trips Screen -->
+<div id="trips-screen">
+  <div class="trips-header">
+    <div class="trips-header-row">
+      <div class="trips-title">Minhas Viagens</div>
+      <button class="trips-new-btn" id="new-trip-btn">+ Nova</button>
+    </div>
+    <div class="trips-subtitle" id="trips-subtitle"></div>
+  </div>
+  <div class="trips-map-box" id="trips-map"></div>
+  <div id="continent-chips-row"></div>
+  <div class="trips-list" id="trips-list"></div>
+</div>
+
+<!-- App -->
+<div id="app">
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="itinerary"><span class="nav-icon">🗓</span><span>Roteiro</span></button>
+    <button class="nav-item" data-page="hotels"><span class="nav-icon">🏨</span><span>Hotéis</span></button>
+    <button class="nav-item" data-page="checklist"><span class="nav-icon">🧳</span><span>Mala</span></button>
+  </nav>
+
+  <!-- Itinerary Page -->
+  <div class="page active" id="page-itinerary">
+    <button class="back-btn" id="back-btn-top">← Minhas Viagens</button>
+    <div class="trip-header" id="trip-header"></div>
+    <div id="map-route-container"></div>
+    <div id="restyle-container"></div>
+    <div id="itinerary-body"></div>
+    <button class="back-btn" id="back-btn-bottom" style="margin:16px 1rem">← Minhas Viagens</button>
+  </div>
+
+  <!-- Hotels Page -->
+  <div class="page" id="page-hotels">
+    <div class="page-section-header">
+      <div class="page-section-eyebrow">Hospedagem</div>
+      <div class="page-section-title">Hotéis</div>
+    </div>
+    <div class="hotels-wrap" id="hotels-list"></div>
+  </div>
+
+  <!-- Checklist Page -->
+  <div class="page" id="page-checklist">
+    <div class="checklist-wrap">
+      <div class="checklist-header">
+        <div class="checklist-title">Mala</div>
+        <button class="checklist-add-btn" id="checklist-add-btn">+ Adicionar</button>
+      </div>
+      <div id="checklist-items"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ══ FIREBASE INIT ══════════════════════════════════════════════ */
+var auth, db, currentUid = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  auth = firebase.auth();
+  db   = firebase.firestore();
+} catch(e) {
+  console.warn('Firebase config not found — running in demo mode:', e.message);
+  /* Show login screen immediately in demo mode */
+  document.addEventListener('DOMContentLoaded', function() {
+    var loading = document.getElementById('loading');
+    var loginScreen = document.getElementById('login-screen');
+    if (loading) loading.classList.add('hidden');
+    if (loginScreen) loginScreen.classList.remove('hidden', 'dismissed');
+  });
+  /* Stub auth and db so the rest of the code doesn't crash */
+  auth = {
+    onAuthStateChanged: function(cb) { /* noop — handled above */ },
+    signInWithEmailAndPassword: function() { return Promise.reject({code:'auth/network-request-failed'}); },
+    createUserWithEmailAndPassword: function() { return Promise.reject({code:'auth/network-request-failed'}); },
+    signOut: function() { return Promise.resolve(); }
+  };
+  db = null;
+}
+
+/* ══ PERSISTENT STORAGE (Firestore) ════════════════════════════ */
+var PS = {
+  _c: {},
+  _doc: function(k) {
+    if (!currentUid) return null;
+    return db.collection('users').doc(currentUid).collection('data').doc(k);
+  },
+  load: async function(k, fb) {
+    if (!currentUid) { this._c[k] = fb; return fb; }
+    try {
+      var doc = await this._doc(k).get();
+      if (doc.exists) { this._c[k] = doc.data().value; return this._c[k]; }
+    } catch(e) {}
+    this._c[k] = fb; return fb;
+  },
+  save: async function(k, v) {
+    this._c[k] = v;
+    if (!currentUid) return;
+    try { await this._doc(k).set({ value: v, updated: firebase.firestore.FieldValue.serverTimestamp() }); } catch(e) {}
+  },
+  remove: async function(k) {
+    delete this._c[k];
+    if (!currentUid) return;
+    try { await this._doc(k).delete(); } catch(e) {}
+  }
+};
+
+/* ══ AUTH ═══════════════════════════════════════════════════════ */
+var authMode = 'login';
+auth.onAuthStateChanged(function(user) {
+  _$('loading').classList.add('hidden');
+  if (user) {
+    currentUid = user.uid;
+    _$('login-screen').classList.add('hidden');
+    _$('logout-user').textContent = user.email.split('@')[0];
+    _$('logout-btn').classList.add('visible');
+    showTripsScreen();
+  } else {
+    currentUid = null;
+    _$('login-screen').classList.remove('hidden','dismissed');
+    _$('logout-btn').classList.remove('visible');
+    hideAll();
+  }
+});
+
+function submitAuth() {
+  var email = _$('login-email').value.trim();
+  var pw    = _$('login-pw').value;
+  var err   = _$('login-error');
+  if (!email || !pw) { err.textContent = 'Preencha e-mail e senha.'; return; }
+  err.innerHTML = '&nbsp;';
+  _$('login-btn').disabled = true;
+  var p = authMode === 'register'
+    ? auth.createUserWithEmailAndPassword(email, pw)
+    : auth.signInWithEmailAndPassword(email, pw);
+  p.catch(function(e) {
+    var m = 'Erro ao autenticar.';
+    if (['auth/user-not-found','auth/wrong-password','auth/invalid-credential'].includes(e.code)) m = 'E-mail ou senha incorretos.';
+    else if (e.code === 'auth/email-already-in-use') m = 'E-mail já cadastrado.';
+    else if (e.code === 'auth/weak-password') m = 'Senha muito fraca (mín. 6 caracteres).';
+    else if (e.code === 'auth/invalid-email') m = 'E-mail inválido.';
+    err.textContent = m;
+    var pw = _$('login-pw'); pw.classList.add('shake'); setTimeout(function(){ pw.classList.remove('shake'); }, 500);
+  }).finally(function() { _$('login-btn').disabled = false; });
+}
+
+function switchAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  var reg = authMode === 'register';
+  _$('login-title').textContent    = reg ? 'Criar Conta' : 'Bem-vindo';
+  _$('login-subtitle').textContent = reg ? 'Crie sua conta com e-mail' : 'Entre para acessar seus roteiros';
+  _$('login-btn').textContent      = reg ? 'Criar Conta' : 'Entrar';
+  _$('login-pw2-field').style.display = reg ? '' : 'none';
+  _$('login-switch').innerHTML = reg
+    ? 'Já tem conta? <a id="switch-mode-link">Entrar</a>'
+    : 'Não tem conta? <a id="switch-mode-link">Criar conta</a>';
+  _$('switch-mode-link').addEventListener('click', switchAuthMode);
+  _$('login-error').innerHTML = '&nbsp;';
+}
+function logout() { auth.signOut(); PS._c = {}; }
+
+/* ══ CURRENCIES ═════════════════════════════════════════════════ */
+var CURR = { BRL:{s:'R$',r:1}, USD:{s:'$',r:0.18}, EUR:{s:'€',r:0.17}, GBP:{s:'£',r:0.14}, JPY:{s:'¥',r:27.5} };
+var displayCur = 'BRL', baseCur = 'BRL';
+function fmtMoney(a, c) { c = c || displayCur; return (CURR[c]||CURR.BRL).s+' '+a.toLocaleString('pt-BR'); }
+function convCost(a, from, to) { if (!a||from===to) return a; return Math.round(a / CURR[from].r * CURR[to].r); }
+
+/* ══ DESTINATIONS DATABASE ═════════════════════════════════════ */
+var DEST_OPTIONS = [
+  {name:'Japão',flag:'🇯🇵',type:'País',region:'Ásia'},
+  {name:'Tóquio',flag:'🇯🇵',type:'Cidade',region:'Ásia'},
+  {name:'Osaka',flag:'🇯🇵',type:'Cidade',region:'Ásia'},
+  {name:'Kyoto',flag:'🇯🇵',type:'Cidade',region:'Ásia'},
+  {name:'Portugal',flag:'🇵🇹',type:'País',region:'Europa'},
+  {name:'Lisboa',flag:'🇵🇹',type:'Cidade',region:'Europa'},
+  {name:'Porto',flag:'🇵🇹',type:'Cidade',region:'Europa'},
+  {name:'Algarve',flag:'🇵🇹',type:'Região',region:'Europa'},
+  {name:'França',flag:'🇫🇷',type:'País',region:'Europa'},
+  {name:'Paris',flag:'🇫🇷',type:'Cidade',region:'Europa'},
+  {name:'Lyon',flag:'🇫🇷',type:'Cidade',region:'Europa'},
+  {name:'Nice',flag:'🇫🇷',type:'Cidade',region:'Europa'},
+  {name:'Provence',flag:'🇫🇷',type:'Região',region:'Europa'},
+  {name:'Itália',flag:'🇮🇹',type:'País',region:'Europa'},
+  {name:'Roma',flag:'🇮🇹',type:'Cidade',region:'Europa'},
+  {name:'Florença',flag:'🇮🇹',type:'Cidade',region:'Europa'},
+  {name:'Veneza',flag:'🇮🇹',type:'Cidade',region:'Europa'},
+  {name:'Milão',flag:'🇮🇹',type:'Cidade',region:'Europa'},
+  {name:'Amalfi',flag:'🇮🇹',type:'Região',region:'Europa'},
+  {name:'Sicília',flag:'🇮🇹',type:'Região',region:'Europa'},
+  {name:'Espanha',flag:'🇪🇸',type:'País',region:'Europa'},
+  {name:'Barcelona',flag:'🇪🇸',type:'Cidade',region:'Europa'},
+  {name:'Madrid',flag:'🇪🇸',type:'Cidade',region:'Europa'},
+  {name:'Sevilha',flag:'🇪🇸',type:'Cidade',region:'Europa'},
+  {name:'Ibiza',flag:'🇪🇸',type:'Cidade',region:'Europa'},
+  {name:'Reino Unido',flag:'🇬🇧',type:'País',region:'Europa'},
+  {name:'Londres',flag:'🇬🇧',type:'Cidade',region:'Europa'},
+  {name:'Edimburgo',flag:'🇬🇧',type:'Cidade',region:'Europa'},
+  {name:'Alemanha',flag:'🇩🇪',type:'País',region:'Europa'},
+  {name:'Berlim',flag:'🇩🇪',type:'Cidade',region:'Europa'},
+  {name:'Munique',flag:'🇩🇪',type:'Cidade',region:'Europa'},
+  {name:'Grécia',flag:'🇬🇷',type:'País',region:'Europa'},
+  {name:'Atenas',flag:'🇬🇷',type:'Cidade',region:'Europa'},
+  {name:'Santorini',flag:'🇬🇷',type:'Cidade',region:'Europa'},
+  {name:'Mykonos',flag:'🇬🇷',type:'Cidade',region:'Europa'},
+  {name:'Turquia',flag:'🇹🇷',type:'País',region:'Europa/Ásia'},
+  {name:'Istambul',flag:'🇹🇷',type:'Cidade',region:'Europa/Ásia'},
+  {name:'Capadócia',flag:'🇹🇷',type:'Região',region:'Europa/Ásia'},
+  {name:'Holanda',flag:'🇳🇱',type:'País',region:'Europa'},
+  {name:'Amsterdã',flag:'🇳🇱',type:'Cidade',region:'Europa'},
+  {name:'Suíça',flag:'🇨🇭',type:'País',region:'Europa'},
+  {name:'Zurique',flag:'🇨🇭',type:'Cidade',region:'Europa'},
+  {name:'Genebra',flag:'🇨🇭',type:'Cidade',region:'Europa'},
+  {name:'Interlaken',flag:'🇨🇭',type:'Cidade',region:'Europa'},
+  {name:'Áustria',flag:'🇦🇹',type:'País',region:'Europa'},
+  {name:'Viena',flag:'🇦🇹',type:'Cidade',region:'Europa'},
+  {name:'Croácia',flag:'🇭🇷',type:'País',region:'Europa'},
+  {name:'Dubrovnik',flag:'🇭🇷',type:'Cidade',region:'Europa'},
+  {name:'Split',flag:'🇭🇷',type:'Cidade',region:'Europa'},
+  {name:'Irlanda',flag:'🇮🇪',type:'País',region:'Europa'},
+  {name:'Dublin',flag:'🇮🇪',type:'Cidade',region:'Europa'},
+  {name:'República Tcheca',flag:'🇨🇿',type:'País',region:'Europa'},
+  {name:'Praga',flag:'🇨🇿',type:'Cidade',region:'Europa'},
+  {name:'Hungria',flag:'🇭🇺',type:'País',region:'Europa'},
+  {name:'Budapeste',flag:'🇭🇺',type:'Cidade',region:'Europa'},
+  {name:'Polônia',flag:'🇵🇱',type:'País',region:'Europa'},
+  {name:'Cracóvia',flag:'🇵🇱',type:'Cidade',region:'Europa'},
+  {name:'Noruega',flag:'🇳🇴',type:'País',region:'Europa'},
+  {name:'Islândia',flag:'🇮🇸',type:'País',region:'Europa'},
+  {name:'Finlândia',flag:'🇫🇮',type:'País',region:'Europa'},
+  {name:'Estados Unidos',flag:'🇺🇸',type:'País',region:'América'},
+  {name:'Nova York',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Miami',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Orlando',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Los Angeles',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'São Francisco',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Las Vegas',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Chicago',flag:'🇺🇸',type:'Cidade',region:'América'},
+  {name:'Havaí',flag:'🇺🇸',type:'Região',region:'América'},
+  {name:'Canadá',flag:'🇨🇦',type:'País',region:'América'},
+  {name:'Toronto',flag:'🇨🇦',type:'Cidade',region:'América'},
+  {name:'Vancouver',flag:'🇨🇦',type:'Cidade',region:'América'},
+  {name:'Montreal',flag:'🇨🇦',type:'Cidade',region:'América'},
+  {name:'México',flag:'🇲🇽',type:'País',region:'América'},
+  {name:'Cancún',flag:'🇲🇽',type:'Cidade',region:'América'},
+  {name:'Cidade do México',flag:'🇲🇽',type:'Cidade',region:'América'},
+  {name:'Argentina',flag:'🇦🇷',type:'País',region:'América'},
+  {name:'Buenos Aires',flag:'🇦🇷',type:'Cidade',region:'América'},
+  {name:'Bariloche',flag:'🇦🇷',type:'Cidade',region:'América'},
+  {name:'Chile',flag:'🇨🇱',type:'País',region:'América'},
+  {name:'Santiago',flag:'🇨🇱',type:'Cidade',region:'América'},
+  {name:'Peru',flag:'🇵🇪',type:'País',region:'América'},
+  {name:'Lima',flag:'🇵🇪',type:'Cidade',region:'América'},
+  {name:'Cusco',flag:'🇵🇪',type:'Cidade',region:'América'},
+  {name:'Colômbia',flag:'🇨🇴',type:'País',region:'América'},
+  {name:'Cartagena',flag:'🇨🇴',type:'Cidade',region:'América'},
+  {name:'Bogotá',flag:'🇨🇴',type:'Cidade',region:'América'},
+  {name:'Uruguai',flag:'🇺🇾',type:'País',region:'América'},
+  {name:'Montevidéu',flag:'🇺🇾',type:'Cidade',region:'América'},
+  {name:'Brasil',flag:'🇧🇷',type:'País',region:'América'},
+  {name:'Rio de Janeiro',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'São Paulo',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Gramado',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Florianópolis',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Salvador',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Foz do Iguaçu',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Fernando de Noronha',flag:'🇧🇷',type:'Região',region:'América'},
+  {name:'Bonito',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Porto Alegre',flag:'🇧🇷',type:'Cidade',region:'América'},
+  {name:'Tailândia',flag:'🇹🇭',type:'País',region:'Ásia'},
+  {name:'Bangkok',flag:'🇹🇭',type:'Cidade',region:'Ásia'},
+  {name:'Phuket',flag:'🇹🇭',type:'Cidade',region:'Ásia'},
+  {name:'Chiang Mai',flag:'🇹🇭',type:'Cidade',region:'Ásia'},
+  {name:'Coreia do Sul',flag:'🇰🇷',type:'País',region:'Ásia'},
+  {name:'Seul',flag:'🇰🇷',type:'Cidade',region:'Ásia'},
+  {name:'China',flag:'🇨🇳',type:'País',region:'Ásia'},
+  {name:'Pequim',flag:'🇨🇳',type:'Cidade',region:'Ásia'},
+  {name:'Xangai',flag:'🇨🇳',type:'Cidade',region:'Ásia'},
+  {name:'Índia',flag:'🇮🇳',type:'País',region:'Ásia'},
+  {name:'Vietnã',flag:'🇻🇳',type:'País',region:'Ásia'},
+  {name:'Hanói',flag:'🇻🇳',type:'Cidade',region:'Ásia'},
+  {name:'Indonésia',flag:'🇮🇩',type:'País',region:'Ásia'},
+  {name:'Bali',flag:'🇮🇩',type:'Região',region:'Ásia'},
+  {name:'Singapura',flag:'🇸🇬',type:'País/Cidade',region:'Ásia'},
+  {name:'Emirados Árabes',flag:'🇦🇪',type:'País',region:'Ásia'},
+  {name:'Dubai',flag:'🇦🇪',type:'Cidade',region:'Ásia'},
+  {name:'Maldivas',flag:'🇲🇻',type:'País',region:'Ásia'},
+  {name:'Sri Lanka',flag:'🇱🇰',type:'País',region:'Ásia'},
+  {name:'Austrália',flag:'🇦🇺',type:'País',region:'Oceania'},
+  {name:'Sydney',flag:'🇦🇺',type:'Cidade',region:'Oceania'},
+  {name:'Melbourne',flag:'🇦🇺',type:'Cidade',region:'Oceania'},
+  {name:'Nova Zelândia',flag:'🇳🇿',type:'País',region:'Oceania'},
+  {name:'Marrocos',flag:'🇲🇦',type:'País',region:'África'},
+  {name:'Marrakesh',flag:'🇲🇦',type:'Cidade',region:'África'},
+  {name:'África do Sul',flag:'🇿🇦',type:'País',region:'África'},
+  {name:'Cidade do Cabo',flag:'🇿🇦',type:'Cidade',region:'África'},
+  {name:'Egito',flag:'🇪🇬',type:'País',region:'África'},
+  {name:'Cairo',flag:'🇪🇬',type:'Cidade',region:'África'},
+  {name:'Cuba',flag:'🇨🇺',type:'País',region:'América'},
+  {name:'Havana',flag:'🇨🇺',type:'Cidade',region:'América'}
+];
+
+/* ── DESTINATION LIST STATE ──────────────────────────────────── */
+var wizDestinations = []; // [{name, flag, type, days: number|'auto'}]
+
+function renderDestList() {
+  var container = _$('dest-list');
+  if (!container) return;
+  container.innerHTML = '';
+  wizDestinations.forEach(function(dest, idx) {
+    var div = document.createElement('div');
+    div.className = 'dest-item has-selection';
+    div.id = 'dest-item-' + idx;
+    div.innerHTML =
+      '<div class="dest-item-header">'
+      + '<span class="dest-item-flag">' + dest.flag + '</span>'
+      + '<span class="dest-item-name">' + escHTML(dest.name) + ' <span style="font-size:11px;color:var(--ink-muted);font-weight:400">' + escHTML(dest.type) + '</span></span>'
+      + '<button class="dest-remove-btn" onclick="removeDest(' + idx + ')" title="Remover destino">−</button>'
+      + '</div>'
+      + '<div class="dest-days-row">'
+      + '<span class="dest-days-label">Dias:</span>'
+      + '<div class="dest-days-toggle">'
+      + '<button class="' + (dest.days === 'auto' ? 'selected' : '') + '" onclick="setDestDays(' + idx + ',\'auto\',this)">IA define</button>'
+      + '<button class="' + (dest.days !== 'auto' ? 'selected' : '') + '" onclick="setDestDays(' + idx + ',\'manual\',this)">Definir</button>'
+      + '</div>'
+      + '<input type="number" class="dest-days-input' + (dest.days !== 'auto' ? ' visible' : '') + '" id="dest-days-val-' + idx + '" value="' + (dest.days !== 'auto' ? dest.days : 3) + '" min="1" max="30" onchange="updateDestDaysVal(' + idx + ',this.value)">'
+      + '</div>';
+    container.appendChild(div);
+  });
+  // Update hidden input for validation
+  _$('wiz-destination').value = wizDestinations.map(function(d) { return d.name; }).join(', ');
+}
+
+function addDestSlot() {
+  var container = _$('dest-list');
+  var idx = 'new_' + Date.now();
+  var div = document.createElement('div');
+  div.className = 'dest-item';
+  div.id = 'dest-slot-' + idx;
+  div.innerHTML =
+    '<div class="dest-search-wrap">'
+    + '<input class="dest-search-input" id="dest-search-' + idx + '" placeholder="Buscar país, cidade ou região…" autocomplete="off">'
+    + '<div class="dest-dropdown" id="dest-dd-' + idx + '"></div>'
+    + '</div>';
+  container.appendChild(div);
+  var input = _$('dest-search-' + idx);
+  var dd = _$('dest-dd-' + idx);
+  var hlIdx = -1;
+  input.focus();
+  input.addEventListener('input', function() {
+    var q = input.value.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (q.length < 1) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+    var results = DEST_OPTIONS.filter(function(opt) {
+      var n = opt.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return n.indexOf(q) !== -1;
+    }).slice(0, 10);
+    if (!results.length) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+    hlIdx = 0;
+    dd.innerHTML = results.map(function(r, i) {
+      return '<div class="dest-dropdown-item' + (i === 0 ? ' highlighted' : '') + '" data-idx="' + i + '">'
+        + '<span class="dd-flag">' + r.flag + '</span>'
+        + '<span class="dd-name">' + escHTML(r.name) + '</span>'
+        + '<span class="dd-type">' + escHTML(r.type) + ' · ' + escHTML(r.region) + '</span>'
+        + '</div>';
+    }).join('');
+    dd.classList.add('open');
+    dd.querySelectorAll('.dest-dropdown-item').forEach(function(item, i) {
+      item.addEventListener('click', function() { selectDest(results[i], div); });
+    });
+  });
+  input.addEventListener('keydown', function(e) {
+    var items = dd.querySelectorAll('.dest-dropdown-item');
+    if (!items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); hlIdx = Math.min(hlIdx + 1, items.length - 1); items.forEach(function(it, i) { it.classList.toggle('highlighted', i === hlIdx); }); items[hlIdx].scrollIntoView({block:'nearest'}); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); hlIdx = Math.max(hlIdx - 1, 0); items.forEach(function(it, i) { it.classList.toggle('highlighted', i === hlIdx); }); items[hlIdx].scrollIntoView({block:'nearest'}); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (hlIdx >= 0 && hlIdx < items.length) items[hlIdx].click(); }
+    else if (e.key === 'Escape') { dd.classList.remove('open'); }
+  });
+  document.addEventListener('click', function handler(e) {
+    if (!div.contains(e.target)) { dd.classList.remove('open'); document.removeEventListener('click', handler); }
+  });
+}
+
+function selectDest(opt, slotEl) {
+  wizDestinations.push({ name: opt.name, flag: opt.flag, type: opt.type, region: opt.region, days: 'auto' });
+  if (slotEl) slotEl.remove();
+  renderDestList();
+}
+
+function removeDest(idx) {
+  wizDestinations.splice(idx, 1);
+  renderDestList();
+}
+
+function setDestDays(idx, mode, btn) {
+  if (mode === 'auto') {
+    wizDestinations[idx].days = 'auto';
+  } else {
+    var val = parseInt(_$('dest-days-val-' + idx).value) || 3;
+    wizDestinations[idx].days = val;
+  }
+  renderDestList();
+}
+
+function updateDestDaysVal(idx, val) {
+  var n = parseInt(val) || 1;
+  wizDestinations[idx].days = Math.max(1, Math.min(30, n));
+}
+
+/* ══ TRIP INDEX ═════════════════════════════════════════════════ */
+var activeTripId = null, editingTripId = null;
+function tripKey(id, s) { return 'tp_'+id+'_'+s; }
+async function loadIndex() { return await PS.load('tp_trip_index', []); }
+async function saveIndex(v) { await PS.save('tp_trip_index', v); }
+
+/* ══ SCREEN MGMT ════════════════════════════════════════════════ */
+function _$(id) { return document.getElementById(id); }
+function hideAll() {
+  _$('wizard').classList.add('hidden');
+  _$('generating').classList.remove('active');
+  _$('trips-screen').classList.remove('active');
+  _$('app').classList.remove('active');
+}
+
+/* ══ TRIPS SCREEN ═══════════════════════════════════════════════ */
+async function showTripsScreen() {
+  hideAll();
+  _$('trips-screen').classList.add('active');
+  await renderTripsList();
+}
+
+async function renderTripsList() {
+  var index = await loadIndex();
+  var container = _$('trips-list');
+  var subtitle  = _$('trips-subtitle');
+  var mapEl     = _$('trips-map');
+
+  if (!index.length) {
+    subtitle.textContent = '';
+    mapEl.innerHTML = '<div class="trips-map-empty"><span>🌍</span><span>Suas viagens aparecerão aqui</span></div>';
+    container.innerHTML = '<div class="trips-empty"><div class="trips-empty-icon">✈️</div><div class="trips-empty-title">Nenhuma viagem ainda</div><div class="trips-empty-sub">Crie seu primeiro roteiro com IA</div></div>';
+    _$('continent-chips-row').innerHTML = '';
+    return;
+  }
+
+  subtitle.textContent = index.length + ' viage' + (index.length===1?'m':'ns');
+
+  var pins = [];
+  for (var i=0; i<index.length; i++) {
+    var t = index[i];
+    var d = await PS.load(tripKey(t.id,'data'), null);
+    if (d) {
+      var pin = getTripPin(t, d);
+      if (pin) pins.push(pin);
+    }
+  }
+  renderTripsMap(pins, mapEl);
+  renderContinentChips(pins);
+
+  var html = '';
+  for (var i=0; i<index.length; i++) {
+    var t = index[i];
+    var checks  = await PS.load(tripKey(t.id,'checks'), {});
+    var deleted = await PS.load(tripKey(t.id,'deleted'), []);
+    var delSet  = new Set(deleted);
+    var data    = await PS.load(tripKey(t.id,'data'), null);
+    var total=0, done=0;
+    if (data && data.cities) data.cities.forEach(function(c,ci){ c.days.forEach(function(d,di){ d.events.forEach(function(e,ei){ var id='c'+ci+'d'+di+'e'+ei; if(!delSet.has(id)){total++; if(checks[id]) done++;} }); }); });
+    var pct = total>0 ? Math.round(done/total*100) : 0;
+    var color = t.color || '#C4622D';
+    var meta = t.dateStart && t.dateEnd ? fmtShortDate(t.dateStart)+' → '+fmtShortDate(t.dateEnd) : '';
+    html += '<div class="trip-card" data-trip-id="'+t.id+'">'
+      + '<div class="trip-card-accent" style="background:'+color+'"></div>'
+      + '<div class="trip-card-body" data-open-trip="'+t.id+'">'
+      + '<div class="trip-card-flag">'+(t.flag||'✈️')+'</div>'
+      + '<div class="trip-card-info"><div class="trip-card-name">'+escHTML(t.name)+'</div><div class="trip-card-meta">'+escHTML(meta)+'</div></div>'
+      + '<div class="trip-card-right"><div class="trip-card-pct">'+pct+'%</div><div class="trip-card-pct-label">completo</div></div>'
+      + '</div>'
+      + '<div class="trip-card-actions">'
+      + '<button class="trip-card-action" data-open-trip="'+t.id+'">Abrir</button>'
+      + '<button class="trip-card-action" data-edit-trip="'+t.id+'">✏️ Editar</button>'
+      + '<button class="trip-card-action danger" data-delete-trip="'+t.id+'">Excluir</button>'
+      + '</div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function renderContinentChips(pins) {
+  var el = _$('continent-chips-row');
+  if (!pins || !pins.length) { el.innerHTML=''; return; }
+  var seen = {};
+  pins.forEach(function(p){ if(p.continent) seen[p.continent]=true; });
+  var cls = {'EUROPA':'europe','AMÉRICA':'america','ÁSIA':'asia','OCEANIA':'oceania','ÁFRICA':'africa'};
+  var names = Object.keys(seen);
+  if (!names.length) { el.innerHTML=''; return; }
+  el.innerHTML = '<div class="continent-chips">' +
+    names.map(function(n){ return '<span class="continent-chip '+(cls[n]||'')+'">'+n+'</span>'; }).join('') +
+    '</div>';
+}
+
+function getTripPin(t, d) {
+  var raw = ((d&&(d.country||d.tripName||''))+' '+(t&&t.name||'')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  var table = [
+    {keys:['nova york','new york','nyc','manhattan','brooklyn'],lat:40.71,lng:-74.01,continent:'AMÉRICA',name:'Nova York'},
+    {keys:['miami','florida','orlando'],lat:25.77,lng:-80.19,continent:'AMÉRICA',name:'Miami'},
+    {keys:['los angeles','hollywood','california'],lat:34.05,lng:-118.24,continent:'AMÉRICA',name:'Los Angeles'},
+    {keys:['chicago'],lat:41.88,lng:-87.63,continent:'AMÉRICA',name:'Chicago'},
+    {keys:['estados unidos','eua','usa'],lat:39.5,lng:-98.35,continent:'AMÉRICA',name:'Estados Unidos'},
+    {keys:['japao','japan','tokyo','toquio','osaka','kyoto','quioto'],lat:35.68,lng:139.69,continent:'ÁSIA',name:'Japão'},
+    {keys:['portugal','lisboa','lisbon','porto'],lat:38.72,lng:-9.14,continent:'EUROPA',name:'Portugal'},
+    {keys:['roma','rome'],lat:41.9,lng:12.5,continent:'EUROPA',name:'Roma'},
+    {keys:['florenca','firenze','florence'],lat:43.77,lng:11.26,continent:'EUROPA',name:'Florença'},
+    {keys:['veneza','venice','venezia'],lat:45.44,lng:12.32,continent:'EUROPA',name:'Veneza'},
+    {keys:['milao','milano','milan'],lat:45.46,lng:9.19,continent:'EUROPA',name:'Milão'},
+    {keys:['italia','italy','itália'],lat:42.8,lng:12.5,continent:'EUROPA',name:'Itália'},
+    {keys:['brasil','brazil'],lat:-14.2,lng:-51.9,continent:'AMÉRICA',name:'Brasil'},
+    {keys:['rio de janeiro','rio'],lat:-22.9,lng:-43.17,continent:'AMÉRICA',name:'Rio de Janeiro'},
+    {keys:['sao paulo','são paulo'],lat:-23.55,lng:-46.63,continent:'AMÉRICA',name:'São Paulo'},
+    {keys:['gramado','canela'],lat:-29.38,lng:-50.87,continent:'AMÉRICA',name:'Gramado'},
+    {keys:['florianopolis','floripa'],lat:-27.59,lng:-48.55,continent:'AMÉRICA',name:'Florianópolis'},
+    {keys:['paris','franca','france','frança','provence','lyon','nice'],lat:48.86,lng:2.35,continent:'EUROPA',name:'Paris'},
+    {keys:['barcelona'],lat:41.39,lng:2.15,continent:'EUROPA',name:'Barcelona'},
+    {keys:['madrid','madri'],lat:40.42,lng:-3.70,continent:'EUROPA',name:'Madrid'},
+    {keys:['espanha','spain','espana'],lat:40.4,lng:-3.7,continent:'EUROPA',name:'Espanha'},
+    {keys:['reino unido','inglaterra','uk','Londres','london'],lat:51.5,lng:-0.12,continent:'EUROPA',name:'Londres'},
+    {keys:['alemanha','germany','berlim','berlin'],lat:51.2,lng:10.4,continent:'EUROPA',name:'Alemanha'},
+    {keys:['argentina','buenos aires'],lat:-34.61,lng:-58.38,continent:'AMÉRICA',name:'Buenos Aires'},
+    {keys:['chile','santiago'],lat:-35.7,lng:-71.5,continent:'AMÉRICA',name:'Chile'},
+    {keys:['peru','lima','cusco'],lat:-9.2,lng:-75.0,continent:'AMÉRICA',name:'Peru'},
+    {keys:['mexico','cancun','cidade do mexico'],lat:23.6,lng:-102.5,continent:'AMÉRICA',name:'México'},
+    {keys:['canada','toronto','vancouver','montreal'],lat:56.1,lng:-106.3,continent:'AMÉRICA',name:'Canadá'},
+    {keys:['australia','sydney','melbourne'],lat:-25.3,lng:133.8,continent:'OCEANIA',name:'Austrália'},
+    {keys:['tailandia','thailand','bangkok','phuket','chiang mai','krabi'],lat:13.75,lng:100.52,continent:'ÁSIA',name:'Tailândia'},
+    {keys:['coreia','korea','seoul','seul'],lat:36.5,lng:127.9,continent:'ÁSIA',name:'Coreia do Sul'},
+    {keys:['china','pequim','beijing','xangai','shanghai'],lat:35.9,lng:104.2,continent:'ÁSIA',name:'China'},
+    {keys:['marrocos','morocco','marrakesh','casablanca'],lat:31.8,lng:-7.1,continent:'ÁFRICA',name:'Marrocos'},
+    {keys:['africa do sul','south africa','cape town'],lat:-30.6,lng:22.9,continent:'ÁFRICA',name:'África do Sul'},
+    {keys:['grecia','greece','atenas','athens','santorini','mykonos'],lat:37.97,lng:23.72,continent:'EUROPA',name:'Grécia'},
+    {keys:['turquia','turkey','istambul','istanbul'],lat:39.9,lng:32.86,continent:'ÁSIA',name:'Turquia'},
+    {keys:['india','mumbai','delhi','goa'],lat:20.59,lng:78.96,continent:'ÁSIA',name:'Índia'},
+    {keys:['vietna','vietnam','hanoi','ho chi minh','saigon'],lat:16.47,lng:107.62,continent:'ÁSIA',name:'Vietnã'},
+    {keys:['indonesia','bali','jakarta'],lat:-8.34,lng:115.09,continent:'ÁSIA',name:'Bali'},
+    {keys:['singapura','singapore'],lat:1.35,lng:103.82,continent:'ÁSIA',name:'Singapura'},
+    {keys:['suica','switzerland','zurique','zurich','genebra','berna'],lat:46.8,lng:8.23,continent:'EUROPA',name:'Suíça'},
+    {keys:['austria','viena','vienna'],lat:47.8,lng:13.03,continent:'EUROPA',name:'Áustria'},
+    {keys:['holanda','netherlands','amsterdam'],lat:52.37,lng:4.9,continent:'EUROPA',name:'Amsterdã'},
+    {keys:['croacia','croatia','dubrovnik','split'],lat:45.1,lng:15.2,continent:'EUROPA',name:'Croácia'},
+    {keys:['nova zelandia','new zealand','auckland','queenstown'],lat:-40.9,lng:174.9,continent:'OCEANIA',name:'Nova Zelândia'}
+  ];
+  for (var i=0;i<table.length;i++)
+    for (var j=0;j<table[i].keys.length;j++)
+      if (raw.indexOf(table[i].keys[j])!==-1)
+        return {lat:table[i].lat,lng:table[i].lng,label:t.flag||'📍',name:table[i].name,continent:table[i].continent};
+  if (d&&d.mapStops&&d.mapStops.length&&isFinite(d.mapStops[0].lat))
+    return {lat:d.mapStops[0].lat,lng:d.mapStops[0].lng,label:t.flag||'📍',name:t.name||'',continent:''};
+  return null;
+}
+
+function renderTripsMap(pins, el) {
+  if (!pins||!pins.length) {
+    el.innerHTML='<div class="trips-map-empty"><span>🌍</span><span>Mapa de destinos</span></div>';
+    return;
+  }
+  var mapId = 'lm-'+Date.now();
+  el.innerHTML = '<div id="'+mapId+'" class="trips-map-real"></div>';
+  function init() {
+    if (!window.L) { setTimeout(init,120); return; }
+    var map = L.map(mapId,{zoomControl:false,attributionControl:false,dragging:true,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false});
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:6,minZoom:1,subdomains:'abcd'}).addTo(map);
+    [['EUROPA',52,15],['ÁSIA',38,90],['ÁFRICA',3,22],['OCEANIA',-25,135],['AMÉRIQUE DO NORTE',46,-103],['AMÉRIQUE DO SUL',-18,-60]].forEach(function(c){
+      L.marker([c[1],c[2]],{interactive:false,icon:L.divIcon({className:'',html:'<div class="tp-cont-label">'+c[0]+'</div>',iconSize:[140,18],iconAnchor:[70,9]})}).addTo(map);
+    });
+    var ordered = pins.slice();
+    if (ordered.length>2) {
+      var route=[ordered[0]],rem=ordered.slice(1);
+      function dist(a,b){return(a.lat-b.lat)**2+(a.lng-b.lng)**2;}
+      while(rem.length){var last=route[route.length-1],bi=0;for(var i=1;i<rem.length;i++)if(dist(last,rem[i])<dist(last,rem[bi]))bi=i;route.push(rem.splice(bi,1)[0]);}
+      ordered=route;
+    }
+    var bounds=[];
+    ordered.forEach(function(p){
+      if(!isFinite(p.lat)||!isFinite(p.lng))return;
+      bounds.push([p.lat,p.lng]);
+      L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:'<div class="tp-pin-pulse"></div><div class="tp-pin"></div>',iconSize:[26,26],iconAnchor:[13,13]})}).addTo(map);
+      L.marker([p.lat,p.lng],{interactive:false,icon:L.divIcon({className:'',html:'<div class="tp-pin-label">'+escHTML(p.name||'')+'</div>',iconSize:[110,18],iconAnchor:[55,-14]})}).addTo(map);
+    });
+    if (ordered.length>1) L.polyline(ordered.filter(function(p){return isFinite(p.lat);}).map(function(p){return[p.lat,p.lng];}),{color:'#B8943C',weight:2.2,opacity:.7,dashArray:'6 8',lineCap:'round'}).addTo(map);
+    if (bounds.length===1) map.setView(bounds[0],3); else map.fitBounds(bounds,{padding:[40,40],maxZoom:3});
+    setTimeout(function(){map.invalidateSize();},150);
+  }
+  init();
+}
+
+async function openTrip(id) {
+  activeTripId = id;
+  var t = await PS.load(tripKey(id,'data'), null);
+  if (!t) return;
+  baseCur = t.budgetCurrency||'BRL'; displayCur = baseCur;
+  hideAll(); renderApp(t);
+}
+async function editTrip(id) {
+  editingTripId = id;
+  var t = await PS.load(tripKey(id,'data'), null);
+  if (!t) return;
+  hideAll();
+  _$('wizard').classList.remove('hidden');
+  // Populate destinations from trip cities
+  wizDestinations = (t.cities || []).map(function(c) {
+    var flag = getFlag(c.name);
+    return { name: c.name, flag: flag, type: 'Destino', days: c.days ? c.days.length : 'auto' };
+  });
+  if (wizDestinations.length === 0 && (t.country || t.tripName)) {
+    wizDestinations = [{ name: t.country || t.tripName, flag: t.flag || '✈️', type: 'Destino', days: 'auto' }];
+  }
+  renderDestList();
+  _$('wiz-destination').value = wizDestinations.map(function(d){return d.name;}).join(', ');
+  var allD = t.cities.reduce(function(a,c){return a.concat(c.days.map(function(d){return d.date;}));},[]).sort();
+  if (allD.length) { _$('wiz-date-start').value=allD[0]; _$('wiz-date-end').value=allD[allD.length-1]; }
+  document.querySelectorAll('#wiz-style-chips .wiz-chip').forEach(function(c){
+    c.classList.toggle('selected', !!(t._styles&&t._styles.includes(c.dataset.style)));
+  });
+  goToWizStep(0);
+}
+async function deleteTrip(id) {
+  if (!confirm('Excluir esta viagem?')) return;
+  var idx = (await loadIndex()).filter(function(t){return t.id!==id;});
+  await saveIndex(idx);
+  await PS.remove(tripKey(id,'data')); await PS.remove(tripKey(id,'checks'));
+  await PS.remove(tripKey(id,'deleted')); await PS.remove(tripKey(id,'checklist'));
+  await renderTripsList();
+}
+function startNewTrip() {
+  editingTripId = null;
+  hideAll();
+  _$('wizard').classList.remove('hidden');
+  _$('wiz-destination').value=''; _$('wiz-notes').value=''; _$('wiz-budget-amount').value='';
+  budgetEnabled=false; budgetPreset='';
+  wizDestinations = [];
+  renderDestList();
+  document.querySelectorAll('#wiz-style-chips .wiz-chip').forEach(function(c){c.classList.remove('selected');});
+  document.querySelectorAll('.wiz-preset-btn').forEach(function(b){b.classList.remove('selected');});
+  _$('budget-no-btn').classList.add('selected'); _$('budget-yes-btn').classList.remove('selected');
+  _$('budget-fields').style.display='none';
+  var s=new Date(); s.setDate(s.getDate()+30); var e=new Date(s); e.setDate(e.getDate()+7);
+  _$('wiz-date-start').value=s.toISOString().split('T')[0];
+  _$('wiz-date-end').value=e.toISOString().split('T')[0];
+  goToWizStep(0);
+  // Auto open first slot
+  setTimeout(function(){ addDestSlot(); }, 100);
+}
+function backToTrips() { activeTripId=null; hideAll(); showTripsScreen(); }
+
+/* ══ WIZARD ═════════════════════════════════════════════════════ */
+var WIZ_TOTAL=5, wizStep=0, travelers=2, budgetEnabled=false, budgetPreset='';
+function goToWizStep(n) {
+  document.querySelectorAll('.wiz-page').forEach(function(p){p.classList.remove('active');});
+  _$('wpage-'+n).classList.add('active');
+  wizStep=n;
+  _$('wiz-step-label').textContent='Passo '+(n+1)+' de '+WIZ_TOTAL;
+  _$('wiz-fill').style.width=((n+1)/WIZ_TOTAL*100)+'%';
+  _$('wiz-next-btn').textContent = n===WIZ_TOTAL-1 ? '✨ Gerar Roteiro' : 'Continuar';
+  _$('wiz-back-btn').style.display = n===0 ? 'none' : '';
+}
+function wizNext() {
+  if (wizStep===0 && wizDestinations.length===0) { addDestSlot(); return; }
+  if (wizStep===1) { if (!_$('wiz-date-start').value||!_$('wiz-date-end').value) return; }
+  if (wizStep===WIZ_TOTAL-1) { generateTrip(); return; }
+  goToWizStep(wizStep+1);
+}
+function wizBack() {
+  if (wizStep<=0) { backToTrips(); return; }
+  goToWizStep(wizStep-1);
+}
+
+/* ══ COUNTRY META ═══════════════════════════════════════════════ */
+function getFlag(dest) {
+  var flags={'brasil':'🇧🇷','rio':'🇧🇷','são paulo':'🇧🇷','gramado':'🇧🇷','florianópolis':'🇧🇷','floripa':'🇧🇷','porto alegre':'🇧🇷','portugal':'🇵🇹','lisboa':'🇵🇹','algarve':'🇵🇹','japão':'🇯🇵','japao':'🇯🇵','tóquio':'🇯🇵','tokyo':'🇯🇵','kyoto':'🇯🇵','osaka':'🇯🇵','eua':'🇺🇸','estados unidos':'🇺🇸','nova york':'🇺🇸','new york':'🇺🇸','miami':'🇺🇸','orlando':'🇺🇸','los angeles':'🇺🇸','chicago':'🇺🇸','são francisco':'🇺🇸','france':'🇫🇷','franca':'🇫🇷','frança':'🇫🇷','paris':'🇫🇷','provence':'🇫🇷','lyon':'🇫🇷','itália':'🇮🇹','italia':'🇮🇹','italy':'🇮🇹','roma':'🇮🇹','rome':'🇮🇹','florença':'🇮🇹','florence':'🇮🇹','firenze':'🇮🇹','veneza':'🇮🇹','venice':'🇮🇹','milão':'🇮🇹','milano':'🇮🇹','amalfi':'🇮🇹','sicilia':'🇮🇹','inglate':'🇬🇧','reino unido':'🇬🇧','uk':'🇬🇧','londres':'🇬🇧','london':'🇬🇧','espanha':'🇪🇸','spain':'🇪🇸','barcelona':'🇪🇸','madrid':'🇪🇸','sevilha':'🇪🇸','alemanha':'🇩🇪','germany':'🇩🇪','berlim':'🇩🇪','berlin':'🇩🇪','argentina':'🇦🇷','buenos aires':'🇦🇷','chile':'🇨🇱','santiago':'🇨🇱','mexico':'🇲🇽','cancun':'🇲🇽','grécia':'🇬🇷','grecia':'🇬🇷','greece':'🇬🇷','atenas':'🇬🇷','santorini':'🇬🇷','mykonos':'🇬🇷','tailândia':'🇹🇭','tailandia':'🇹🇭','thailand':'🇹🇭','bangkok':'🇹🇭','phuket':'🇹🇭','chiang mai':'🇹🇭','turquia':'🇹🇷','turkey':'🇹🇷','istambul':'🇹🇷','canadá':'🇨🇦','canada':'🇨🇦','toronto':'🇨🇦','vancouver':'🇨🇦','colombia':'🇨🇴','peru':'🇵🇪','coreia':'🇰🇷','korea':'🇰🇷','seul':'🇰🇷','holanda':'🇳🇱','amsterdam':'🇳🇱','netherlands':'🇳🇱','croácia':'🇭🇷','croatia':'🇭🇷','dubrovnik':'🇭🇷','marrocos':'🇲🇦','morocco':'🇲🇦','irlanda':'🇮🇪','ireland':'🇮🇪','austrália':'🇦🇺','australia':'🇦🇺','sydney':'🇦🇺','melbourne':'🇦🇺','índia':'🇮🇳','india':'🇮🇳','bali':'🇮🇩','indonesia':'🇮🇩','vietnã':'🇻🇳','vietnam':'🇻🇳','singapura':'🇸🇬','singapore':'🇸🇬','suíça':'🇨🇭','switzerland':'🇨🇭','áustria':'🇦🇹','austria':'🇦🇹','viena':'🇦🇹','nova zelândia':'🇳🇿','new zealand':'🇳🇿'};
+  var l=dest.toLowerCase();
+  for (var k in flags) if (l.indexOf(k)!==-1) return flags[k];
+  return '✈️';
+}
+
+/* ══ MOCK DATA ══════════════════════════════════════════════════ */
+var DEST_DB = {
+  /* ── JAPAN ─────────────────────────────────────────────────── */
+  japao:{
+    keys:['japao','japan','japão','toquio','tokyo','tóquio','osaka','kyoto','quioto'],
+    flag:'🇯🇵',color:'#C4622D',lat:35.68,lng:139.69,
+    cafes:[
+      {title:'% Arabica Roppongi',location:'6 Chome-6-9 Roppongi, Minato, Tokyo',desc:'Cafeteria minimalista de design; espresso cremoso e latte art impecável.'},
+      {title:'Fuglen Tokyo',location:'1 Chome-16-11 Tomigaya, Shibuya City, Tokyo',desc:'Café norueguês icônico em Tomigaya — torração clara e ambiente retrô.'},
+      {title:'Café de l\'Ambre',location:'8 Chome-10-15 Ginza, Chuo City, Tokyo',desc:'Cafeteria lendária de Ginza, aberta desde 1948, café envelhecido em barril.'},
+      {title:'Blue Bottle Coffee Shinjuku',location:'3 Chome-3-7 Shinjuku, Shinjuku City, Tokyo',desc:'Unidade ampla da Blue Bottle com single-origins de excelência.'}
+    ],
+    morningAttractions:[
+      {title:'Senso-ji Temple — Asakusa',location:'2 Chome-3-1 Asakusa, Taito City, Tokyo',desc:'Templo mais famoso de Tóquio; impressionante ao amanhecer, antes das multidões.'},
+      {title:'Tsukiji Outer Market',location:'4 Chome-16-2 Tsukiji, Chuo City, Tokyo',desc:'Mercado externo com sushi fresco, tamagoyaki e frutos do mar desde as 5h.'},
+      {title:'Meiji Shrine',location:'1-1 Yoyogikamizonocho, Shibuya City, Tokyo',desc:'Santuário xintoísta cercado por floresta densa no coração de Shibuya.'},
+      {title:'Shinjuku Gyoen National Garden',location:'11 Naito-machi, Shinjuku City, Tokyo',desc:'Jardim imperial com 1500 cerejeiras; tranquilo nas primeiras horas.'}
+    ],
+    lunches:[
+      {title:'Ichiran Shibuya',location:'1 Chome-22-7 Jinnan, Shibuya City, Tokyo',desc:'Ramen tonkotsu em cabines individuais — ritual obrigatório em Tóquio.'},
+      {title:'Sushi Dai — Tsukiji',location:'6 Chome-21-2 Tsukiji, Chuo City, Tokyo',desc:'Sushi omakase do mercado externo; fila curta de manhã, vale cada minuto.'},
+      {title:'Tempura Tsunahachi Shinjuku',location:'3 Chome-31-8 Shinjuku, Shinjuku City, Tokyo',desc:'Tempurá clássico frito na hora desde 1923, ambiente tradicional.'},
+      {title:'Gyukatsu Motomura Shibuya',location:'2 Chome-29-5 Dogenzaka, Shibuya City, Tokyo',desc:'Katsu de carne wagyu grelhado na pedra quente — especialidade única.'}
+    ],
+    afternoonAttractions:[
+      {title:'teamLab Planets Tokyo',location:'6-1-16 Toyosu, Koto City, Tokyo',desc:'Instalação de arte digital imersiva; sensação de flutuar em universo digital.'},
+      {title:'Shibuya Sky — Rooftop',location:'2-24-12 Shibuya, Shibuya City, Tokyo',desc:'Observatório do topo da Scramble Square com vista 360° sobre Tóquio.'},
+      {title:'Takeshita Street — Harajuku',location:'1 Chome-17 Jingumae, Shibuya City, Tokyo',desc:'Rua icônica da moda kawaii; crepes gigantes, lojas únicas e cosplay.'},
+      {title:'Akihabara Electric Town',location:'Akihabara, Chiyoda City, Tokyo',desc:'Meca da cultura otaku: eletrônicos, anime, arcades e maid cafés.'}
+    ],
+    afternoonCafes:[
+      {title:'Marion Crepes Harajuku',location:'1 Chome-6-15 Jingumae, Shibuya City, Tokyo',desc:'Crepes artesanais dobrados em cone — clássico irresistível de Harajuku.'},
+      {title:'Nakamura Tokichi Honten — Uji',location:'20 Ujiichiban, Uji, Kyoto',desc:'Chá matcha e doces wagashi na cidade do chá verde mais famosa do Japão.'},
+      {title:'% Arabica Kyoto Higashiyama',location:'87-5 Hoshinocho, Higashiyama Ward, Kyoto',desc:'Café em ruelas de pedra de Higashiyama — latte com vista para o templo.'},
+      {title:'Walden Woods Kyoto',location:'9 Naginataboko-cho, Nakagyo Ward, Kyoto',desc:'Café boutique com torração própria, silêncioso e de design impecável.'}
+    ],
+    sunsets:[
+      {title:'Tokyo Skytree — Observation Deck',location:'1 Chome-1-2 Oshiage, Sumida City, Tokyo',desc:'634 m de altura — melhor pôr do sol sobre a planície de Tóquio.'},
+      {title:'Shibuya Sky — Hora Dourada',location:'2-24-12 Shibuya, Shibuya City, Tokyo',desc:'Luz laranja sobre o cruzamento de Shibuya visto do alto é cinema puro.'},
+      {title:'Kiyomizu-dera — Entardecer',location:'1-294 Kiyomizu, Higashiyama Ward, Kyoto',desc:'Templo sobre a colina; por do sol tingindo a cidade de Kyoto de dourado.'},
+      {title:'Fushimi Inari ao Entardecer',location:'68 Fukakusa Yabunouchicho, Fushimi Ward, Kyoto',desc:'Torii laranja-vermelho dourado com a luz do fim de tarde — fotogênico único.'}
+    ],
+    dinners:[
+      {title:'Gonpachi Nishi-Azabu',location:'1 Chome-13-11 Nishiazabu, Minato City, Tokyo',desc:'Izakaya cenográfica do Kill Bill; yakitori e sake em ambiente de pagode.'},
+      {title:'Ichiran Ramen — Shibuya',location:'1 Chome-22-7 Jinnan, Shibuya City, Tokyo',desc:'Ramen solo em cabines privativas — experiência meditativa japonesa.'},
+      {title:'Pontocho Alley — Kyoto',location:'Pontocho, Nakagyo Ward, Kyoto',desc:'Beco estreito com restaurantes de tatami, geishas e cozinha kaiseki.'},
+      {title:'Kikunoi Roan — Kyoto',location:'459 Shimogawaracho, Higashiyama Ward, Kyoto',desc:'Kaiseki acessível do chef Murata; 3 estrelas Michelin na versão principal.'}
+    ],
+    nightlife:[
+      {title:'Golden Gai — Shinjuku',location:'1 Chome-1 Kabukicho, Shinjuku City, Tokyo',desc:'200+ barzinhos minúsculos em 6 ruelas; cada um com tema e personalidade.'},
+      {title:'Omoide Yokocho — Piss Alley',location:'1 Chome-2 Nishishinjuku, Shinjuku City, Tokyo',desc:'Beco fumacento com espetos yakitori e cerveja gelada desde os anos 50.'},
+      {title:'Gion District à Noite — Kyoto',location:'Gionmachi Kitagawa, Higashiyama Ward, Kyoto',desc:'Passeio noturno no bairro das geishas; lanternas e casas de madeira.'},
+      {title:'Bar Benfiddich — Shinjuku',location:'9 Chome-7-18 Nishishinjuku, Shinjuku City, Tokyo',desc:'Bar premiado onde o bartender colhe ervas ao vivo para seus coquetéis.'}
+    ]
+  },
+  /* ── PORTUGAL ───────────────────────────────────────────────── */
+  portugal:{
+    keys:['portugal','lisboa','lisbon','porto','algarve'],
+    flag:'🇵🇹',color:'#2D6BC4',lat:38.72,lng:-9.14,
+    cafes:[
+      {title:'A Brasileira',location:'Rua Garrett, 120, Chiado, Lisboa',desc:'Café histórico de 1905 com estátua do Fernando Pessoa na esplanada.'},
+      {title:'Pastéis de Belém',location:'Rua de Belém, 84-92, Belém, Lisboa',desc:'Original desde 1837 — pastel de nata com canela saído do forno.'},
+      {title:'Copenhagen Coffee Lab',location:'Rua Nova da Piedade, 10, Príncipe Real, Lisboa',desc:'Torração escandinava em Príncipe Real; flat white perfeito.'},
+      {title:'Fauna & Flora',location:'Rua do Alecrim, 54, Lisboa',desc:'Café botânico no Chiado com plantas, sucos e brunch cuidadoso.'}
+    ],
+    morningAttractions:[
+      {title:'Mosteiro dos Jerónimos',location:'Praça do Império, Belém, Lisboa',desc:'Obra-prima manuelina do século XVI — Patrimônio Mundial UNESCO.'},
+      {title:'Torre de Belém',location:'Av. Brasília, Belém, Lisboa',desc:'Ícone de Lisboa na margem do Tejo, símbolo das navegações.'},
+      {title:'Castelo de São Jorge',location:'Rua de Santa Cruz do Castelo, Alfama, Lisboa',desc:'Castelo mouro com vista de 360° sobre os telhados de Lisboa.'},
+      {title:'Feira da Ladra — Campo de Santa Clara',location:'Campo de Santa Clara, Alfama, Lisboa',desc:'Famosa feira de pulgas terças e sábados em Alfama.'}
+    ],
+    lunches:[
+      {title:'Time Out Market Lisboa',location:'Av. 24 de Julho, 49, Cais do Sodré, Lisboa',desc:'Mercado gourmet com os melhores chefs de Lisboa sob um teto só.'},
+      {title:'Cervejaria Ramiro',location:'Av. Almirante Reis, 1H, Lisboa',desc:'Marisqueira de 1956; percebes, gambas e amêijoas à Bulhão Pato.'},
+      {title:'Solar dos Presuntos',location:'Rua das Portas de Santo Antão, 150, Lisboa',desc:'Cozinha alentejana clássica: porco preto, bacalhau, presunto.'},
+      {title:'Tasca do Chico',location:'Rua do Diário de Notícias, 39, Bairro Alto, Lisboa',desc:'Tasca íntima com fado ao vivo às terças; bacalhau à brás imperdível.'}
+    ],
+    afternoonAttractions:[
+      {title:'LX Factory',location:'Rua Rodrigues de Faria, 103, Alcântara, Lisboa',desc:'Complexo criativo em fábrica antiga; lojas, livraria, mercado domingo.'},
+      {title:'Museu Nacional do Azulejo',location:'Rua da Madre de Deus, 4, Lisboa',desc:'Convento do século XV transformado em museu do azulejo português.'},
+      {title:'Bairro Alto',location:'Rua do Diário de Notícias, Bairro Alto, Lisboa',desc:'Bairro boêmio com galerias, concept stores e tabernas animadas.'},
+      {title:'Elevador de Santa Justa',location:'Rua do Ouro, Baixa, Lisboa',desc:'Elevador neogótico de ferro fundido com vista privilegiada da Baixa.'}
+    ],
+    afternoonCafes:[
+      {title:'Manteigaria — Fábrica de Pastéis',location:'Rua do Loreto, 2, Chiado, Lisboa',desc:'Pastéis de nata feitos à vista, quentes e polvilhados de canela.'},
+      {title:'Hello, Kristof',location:'Rua de São Bento, 81, São Bento, Lisboa',desc:'Café aconchegante em São Bento com croissants e cafés especiais.'},
+      {title:'Confeitaria Nacional',location:'Praça da Figueira, 18B, Lisboa',desc:'Confeitaria de 1829 com doces tradicionais e bolos regionais.'},
+      {title:'Café da Garagem',location:'Costa do Castelo, 75, Alfama, Lisboa',desc:'Café cultural na encosta do castelo com vista e arte local.'}
+    ],
+    sunsets:[
+      {title:'Miradouro da Graça',location:'Calçada da Graça, Graça, Lisboa',desc:'O mais bonito miradouro de Lisboa; castelo, tejo e cidade toda visíveis.'},
+      {title:'Miradouro de Santa Catarina',location:'Rua de Santa Catarina, Bairro Alto, Lisboa',desc:'Miradouro boêmio com músicos, artistas e cerveja no por do sol.'},
+      {title:'Miradouro das Portas do Sol',location:'Largo das Portas do Sol, Alfama, Lisboa',desc:'Vista sobre Alfama e o rio Tejo dourado no entardecer.'},
+      {title:'Miradouro de São Pedro de Alcântara',location:'Rua de São Pedro de Alcântara, Lisboa',desc:'Jardim suspenso com vista do Castelo de São Jorge iluminado.'}
+    ],
+    dinners:[
+      {title:'Taberna da Rua das Flores',location:'Rua das Flores, 103, Chiado, Lisboa',desc:'Petiscos modernos e vinhos naturais numa tasca contemporânea.'},
+      {title:'Belcanto — José Avillez',location:'Largo de São Carlos, 10, Chiado, Lisboa',desc:'2 estrelas Michelin; cozinha portuguesa de vanguarda no Chiado.'},
+      {title:'O Frade',location:'Rua dos Bacalhoeiros, 34, Alfama, Lisboa',desc:'Bacalhau em 50 receitas num restaurante tipicamente lisboeta.'},
+      {title:'Zé da Mouraria',location:'Rua João do Outeiro, 24, Mouraria, Lisboa',desc:'Tasca familiar na Mouraria com pratos do dia caseiros e baratos.'}
+    ],
+    nightlife:[
+      {title:'Pink Street — Rua Nova do Carvalho',location:'Rua Nova do Carvalho, Cais do Sodré, Lisboa',desc:'Rua rosa com bares animados, música ao vivo e ambiente eclético.'},
+      {title:'Lux Frágil',location:'Av. Infante Dom Henrique, Armazém A, Lisboa',desc:'Clube à beira do Tejo considerado um dos melhores da Europa.'},
+      {title:'Bairro Alto — Noite',location:'Rua do Diário de Notícias, Bairro Alto, Lisboa',desc:'Dezenas de bares porta a porta; drinks saem para a calçada.'},
+      {title:'Tasca do Chico — Fado',location:'Rua do Diário de Notícias, 39, Bairro Alto, Lisboa',desc:'Fado vadio ao vivo em mesa de jantar; reserva obrigatória.'}
+    ]
+  },
+  /* ── FRANCE / PARIS ─────────────────────────────────────────── */
+  paris:{
+    keys:['paris','franca','france','frança','provence','nice','lyon'],
+    flag:'🇫🇷',color:'#8B5CF6',lat:48.86,lng:2.35,
+    cafes:[
+      {title:'Café de Flore',location:'172 Boulevard Saint-Germain, Saint-Germain-des-Prés, Paris',desc:'Café literário onde Sartre e Simone de Beauvoir escreveram. Croissant obrigatório.'},
+      {title:'Angelina Paris',location:'226 Rue de Rivoli, 1er, Paris',desc:'Salon de thé histórico; chocolate chaud à l\'ancienne e Mont-Blanc.'},
+      {title:'Ten Belles Coffee',location:'10 Rue de la Grange aux Belles, Paris 10e',desc:'Torrador especialidade do Canal Saint-Martin; flat white impecável.'},
+      {title:'Café de la Paix',location:'5 Place de l\'Opéra, 9e, Paris',desc:'Brasserie Belle Époque em frente à Ópera Garnier desde 1862.'}
+    ],
+    morningAttractions:[
+      {title:'Musée du Louvre',location:'Rue de Rivoli, 75001 Paris',desc:'Maior museu do mundo; chegue às 9h para ver a Mona Lisa sem multidão.'},
+      {title:'Tour Eiffel — Manhã',location:'Champ de Mars, 5 Av. Anatole France, Paris',desc:'A Torre de Ferro de manhã tem fila menor; vista melhor com céu claro.'},
+      {title:'Musée d\'Orsay',location:'1 Rue de la Légion d\'Honneur, Paris 7e',desc:'Impressionistas num palazzo de estação; Monet, Van Gogh, Renoir.'},
+      {title:'Marché d\'Aligre',location:'Place d\'Aligre, Bastille, Paris 12e',desc:'Mercado mais autêntico de Paris; frutas, queijos e vinho barato.'}
+    ],
+    lunches:[
+      {title:'Bouillon Chartier',location:'7 Rue du Faubourg Montmartre, Paris 9e',desc:'Brasserie popular de 1896; steak frites e vin rouge a preço justo.'},
+      {title:'L\'As du Fallafel',location:'34 Rue des Rosiers, Le Marais, Paris 4e',desc:'O melhor falafel de Paris no coração do Marais judeu.'},
+      {title:'Brasserie Lipp',location:'151 Boulevard Saint-Germain, Paris 6e',desc:'Brasserie clássica do século XIX; choucroute, jarret e bière pression.'},
+      {title:'Chez Janou',location:'2 Rue Roger Verlomme, Le Marais, Paris 3e',desc:'Bistrô provençal no Marais; tapenade, pistou e mousse de chocolate.'}
+    ],
+    afternoonAttractions:[
+      {title:'Montmartre & Sacré-Cœur',location:'35 Rue du Chevalier de la Barre, Paris 18e',desc:'Colina dos artistas; ruas de paralelepípedo, ateliers e vista de Paris.'},
+      {title:'Le Marais District',location:'Rue des Rosiers, Paris 4e',desc:'Bairro histórico com galerias, fashion e arquitetura medieval.'},
+      {title:'Centre Pompidou',location:'Place Georges-Pompidou, Paris 4e',desc:'Museu de arte moderna com arquitetura outside-in; vista do telhado.'},
+      {title:'Sainte-Chapelle',location:'8 Boulevard du Palais, Paris 1er',desc:'Gótico flamboyant; 1113 m² de vitrais medievais iluminados pelo sol.'}
+    ],
+    afternoonCafes:[
+      {title:'Pierre Hermé',location:'72 Rue Bonaparte, Saint-Germain, Paris 6e',desc:'O Picasso da pâtisserie; macarons Ispahan (rosa, lichia e framboesa).'},
+      {title:'Ladurée Saint-Germain',location:'21 Rue Bonaparte, Paris 6e',desc:'Maison de macarons desde 1862; caixinhas verdes são presentes perfeitos.'},
+      {title:'Du Pain et des Idées',location:'34 Rue Yves Toudic, Canal Saint-Martin, Paris 10e',desc:'Melhor boulangerie de Paris; escargot de pistache e pain des amis.'},
+      {title:'Jacques Genin',location:'133 Rue de Turenne, Le Marais, Paris 3e',desc:'Mestre chocolateiro; caramelos salgados e millefeuilles sob encomenda.'}
+    ],
+    sunsets:[
+      {title:'Sacré-Cœur — Topo da Butte Montmartre',location:'35 Rue du Chevalier de la Barre, Paris 18e',desc:'Panorama de Paris ao entardecer da colina mais alta da cidade.'},
+      {title:'Pont des Arts — Hora Dourada',location:'Pont des Arts, Paris 6e',desc:'A ponte mais romântica ao lado do Louvre — luz dourada e o Sena.'},
+      {title:'Arc de Triomphe — Terraço',location:'Place Charles de Gaulle, Paris 8e',desc:'50 m de altura com vista dos Champs-Élysées e toda Paris.'},
+      {title:'Tour Eiffel ao Entardecer',location:'Champ de Mars, 5 Av. Anatole France, Paris',desc:'A torre acende 20.000 luzes toda hora; reserva o jantar por perto.'}
+    ],
+    dinners:[
+      {title:'Septime',location:'80 Rue de Charonne, Bastille, Paris 11e',desc:'1 estrela Michelin descontraída; menu sazonal com vinhos naturais.'},
+      {title:'Le Comptoir du Relais',location:'9 Carrefour de l\'Odéon, Paris 6e',desc:'Yves Camdeborde; menu bistronômico à noite, tapas no balcão.'},
+      {title:'Frenchie',location:'5 Rue du Nil, Sentier, Paris 2e',desc:'Novo bistronômico liderado por Greg Marchand; reserva com semanas.'},
+      {title:'Chez L\'Ami Jean',location:'27 Rue Malar, Paris 7e',desc:'Cozinha basca robusta; arroz de leite no fim da refeição é lendário.'}
+    ],
+    nightlife:[
+      {title:'Le Perchoir — Rooftop',location:'14 Rue Crespin du Gast, Paris 11e',desc:'Terraço com vista de Paris ao entardecer; cocktails criativos.'},
+      {title:'Caveau de la Huchette — Jazz',location:'5 Rue de la Huchette, Paris 5e',desc:'Jazz club num porão medieval desde 1946; dança até de madrugada.'},
+      {title:'Le Marais à Noite',location:'Rue de la Bretagne, Paris 3e',desc:'Bares wine-bar, cervejarias artesanais e clubs LGBTQ+ animados.'},
+      {title:'Moulin Rouge',location:'82 Boulevard de Clichy, Montmartre, Paris 18e',desc:'Cabaré original de 1889; espetáculo Féerie todas as noites.'}
+    ]
+  },
+  /* ── ITALY / ROME ───────────────────────────────────────────── */
+  italia:{
+    keys:['italia','italy','itália','roma','rome','florenca','firenze','florence','veneza','venice','venezia','milao','milano'],
+    flag:'🇮🇹',color:'#C4622D',lat:41.9,lng:12.5,
+    cafes:[
+      {title:'Sant\'Eustachio il Caffè',location:'Piazza di Sant\'Eustachio, 82, Roma',desc:'O melhor espresso de Roma; receita secreta, sempre servido com espuma.'},
+      {title:'Antico Caffè Greco',location:'Via Condotti, 86, Roma',desc:'Cafeteria mais antiga de Roma (1760); Goethe e Keats eram frequentes.'},
+      {title:'Roscioli Caffè',location:'Piazza Benedetto Cairoli, 16, Roma',desc:'Ramo café do famoso Roscioli; cornetti di pasta frolla fresquinhos.'},
+      {title:'Caffè Rivoire — Firenze',location:'Piazza della Signoria, 5R, Firenze',desc:'Chocolateria e caffè com vista para o Palazzo Vecchio e David.'}
+    ],
+    morningAttractions:[
+      {title:'Colosseo & Foro Romano',location:'Piazza del Colosseo, 1, Roma',desc:'Anfiteatro de 70.000 lugares; chegue antes das 9h para evitar filas.'},
+      {title:'Vaticano & Cappella Sistina',location:'Piazza San Pietro, Città del Vaticano',desc:'Michelangelo no teto e a Pietà — reserva online essencial.'},
+      {title:'Uffizi Gallery — Firenze',location:'Piazzale degli Uffizi, 6, Firenze',desc:'Botticelli, Leonardo e Caravaggio — a galeria mais importante da Itália.'},
+      {title:'Galleria dell\'Accademia — Firenze',location:'Via Ricasoli, 58-60, Firenze',desc:'O David de Michelangelo em escala real; silêncio e arrepios garantidos.'}
+    ],
+    lunches:[
+      {title:'Armando al Pantheon',location:'Salita de\' Crescenzi, 31, Roma',desc:'Trattoria familiar em frente ao Pantheon; cacio e pepe e trippa della domenica.'},
+      {title:'Da Enzo al 29 — Trastevere',location:'Via dei Vascellari, 29, Trastevere, Roma',desc:'Cucina romana autêntica em Trastevere; filetto di baccalà e rigatoni.'},
+      {title:'All\'Antico Vinaio — Firenze',location:'Via dei Neri, 65R, Firenze',desc:'Fila na rua para o melhor schiacciata recheado de Florença.'},
+      {title:'Cantina Do Spade — Venezia',location:'Calle Do Spade, San Polo, Venezia',desc:'Bacaro histórico perto de Rialto; cicheti e ombra de vinho local.'}
+    ],
+    afternoonAttractions:[
+      {title:'Galleria Borghese',location:'Piazzale Scipione Borghese, 5, Roma',desc:'Bernini e Caravaggio numa vila; entrada limitada — reserva obrigatória.'},
+      {title:'Castel Sant\'Angelo',location:'Lungotevere Castello, 50, Roma',desc:'Mausoléu de Adriano; terraço com vista do Tibre e do Vaticano.'},
+      {title:'Piazzale Michelangelo — Firenze',location:'Piazzale Michelangelo, Firenze',desc:'Mirante com vista clássica de Florença e cópia do David em bronze.'},
+      {title:'Basilica di Santa Maria della Salute — Venezia',location:'Dorsoduro, 1, Venezia',desc:'Basílica barroca na entrada do Grande Canal — fotografia icônica.'}
+    ],
+    afternoonCafes:[
+      {title:'Giolitti — Roma',location:'Via degli Uffici del Vicario, 40, Roma',desc:'Gelateria histórica perto do Pantheon desde 1900; pistachio obrigatório.'},
+      {title:'Gelateria dei Neri — Firenze',location:'Via dei Neri, 9R, Firenze',desc:'Gelato artesanal denso em Florença; fico, tiramisù e cioccolato fondente.'},
+      {title:'Pasticceria Tonolo — Venezia',location:'Calle San Pantalon, 3764, Venezia',desc:'Pastelaria veneziana favorita dos locais; crostate e zabaione.'},
+      {title:'Il Gelato di San Crispino',location:'Via della Panetteria, 42, Roma',desc:'Gelato premium sem cones; só taças para preservar a temperatura.'}
+    ],
+    sunsets:[
+      {title:'Giardino degli Aranci — Aventino',location:'Piazza Pietro d\'Illiria, 1, Aventino, Roma',desc:'Jardim secreto com a melhor vista do Tibre e da cúpula do Vaticano.'},
+      {title:'Gianicolo — Terraço',location:'Piazzale Giuseppe Garibaldi, Gianicolo, Roma',desc:'Ponto mais alto da cidade com canhão das 12h e pôr do sol cor-de-rosa.'},
+      {title:'Piazzale Michelangelo — Pôr do Sol',location:'Piazzale Michelangelo, Firenze',desc:'Vista clássica de Florença tingida de laranja e rosa ao entardecer.'},
+      {title:'Rialto Bridge — Sunset',location:'Ponte di Rialto, Venezia',desc:'O Grande Canal cor de mel visto da ponte mais famosa de Veneza.'}
+    ],
+    dinners:[
+      {title:'Da Remo — Pizza Romana',location:'Piazza Santa Maria Liberatrice, 44, Testaccio, Roma',desc:'Pizza romana fina e crocante; forno a lenha, fila na porta, vale tudo.'},
+      {title:'Tonnarello — Trastevere',location:'Via della Paglia, 1, Trastevere, Roma',desc:'Clássico de Trastevere; cacio e pepe, coda alla vaccinara, ambiente animado.'},
+      {title:'Trattoria Mario — Firenze',location:'Via Rosina, 2r, Firenze',desc:'Almoço comunitário sem menu fixo; sentar com desconhecidos é a graça.'},
+      {title:'Osteria alle Testiere — Venezia',location:'Calle del Mondo Novo, Castello, Venezia',desc:'11 mesas, frutos do mar fresquíssimos; reserva obrigatória com semanas.'}
+    ],
+    nightlife:[
+      {title:'Trastevere à Noite',location:'Piazza di Santa Maria in Trastevere, Roma',desc:'Bairro mais animado de Roma; bares, vinhos naturais e vida nas ruas.'},
+      {title:'Testaccio Club District',location:'Via di Monte Testaccio, Roma',desc:'Clubes dentro de adegas escavadas na rocha; techno e house ao vivo.'},
+      {title:'Oltrarno à Noite — Firenze',location:'Piazza Santo Spirito, Firenze',desc:'Praça boêmia de Florença com enotecas, aperitivo e músicos de rua.'},
+      {title:'Spritz no Campo de\' Fiori',location:'Piazza Campo de\' Fiori, Roma',desc:'Bar ao ar livre na praça de mercado; Aperol Spritz e burrata.'}
+    ]
+  },
+  /* ── SPAIN / BARCELONA ──────────────────────────────────────── */
+  espanha:{
+    keys:['barcelona','espanha','spain','espana','españa','madri','madrid','sevilha','seville'],
+    flag:'🇪🇸',color:'#D97706',lat:41.39,lng:2.15,
+    cafes:[
+      {title:'Federal Café Barcelona',location:'Carrer del Parlament, 39, Sant Antoni, Barcelona',desc:'Café australiano que popularizou o brunch em Barcelona; ovos e flat white.'},
+      {title:'Satan\'s Coffee Corner',location:'Carrer de l\'Arc de Sant Ramon del Call, 11, Barcelona',desc:'Café de especialidade no Barri Gòtic; espresso e drip coffee impecáveis.'},
+      {title:'Nomad Coffee Lab',location:'Passatge Sert, 12, Barcelona',desc:'Torrador de referência com provas guiadas e cursos de barista.'},
+      {title:'Bar El Xampanyet',location:'Carrer de Montcada, 22, El Born, Barcelona',desc:'Bar histórico do El Born com cava caseiro e anchovas da lata.'}
+    ],
+    morningAttractions:[
+      {title:'Sagrada Família',location:'Carrer de Mallorca, 401, Eixample, Barcelona',desc:'Gaudí inacabado e genial; reserva torre para vista sobre a cidade.'},
+      {title:'Park Güell',location:'Carrer d\'Olot, 7, Gràcia, Barcelona',desc:'Parque de mosaicos e salamandras de Gaudí; área central paga.'},
+      {title:'La Boqueria',location:'La Rambla, 91, Barcelona',desc:'Mercado de 1840; frutas exóticas, peixe fresco e bares de café da manhã.'},
+      {title:'Barri Gòtic — Catedral',location:'Pla de la Seu, s/n, Barcelona',desc:'Catedral gótica de 1298 com claustro de gansos; labirinto medieval.'}
+    ],
+    lunches:[
+      {title:'Bar Pinotxo — La Boqueria',location:'La Rambla, 91, Stall 66-67, Barcelona',desc:'Balcão dentro da Boqueria; garbanzos com bacalhau e cava às 10h.'},
+      {title:'Cervecería Catalana',location:'Carrer de Mallorca, 236, Eixample, Barcelona',desc:'Tapas e montaditos de qualidade; filas na porta, sem reserva.'},
+      {title:'Bar Cañete',location:'Carrer de la Unió, 17, Raval, Barcelona',desc:'Balcão de tapas clássico; jamón ibérico, croquetas e gamba al ajillo.'},
+      {title:'La Cova Fumada — Barceloneta',location:'Carrer del Baluard, 56, Barceloneta, Barcelona',desc:'Inventora da bomba e do pan con tomate; arrive antes das 13h.'}
+    ],
+    afternoonAttractions:[
+      {title:'Casa Batlló',location:'Passeig de Gràcia, 43, Eixample, Barcelona',desc:'Gaudí transformou um prédio banal em obra-prima; magic nights no telhado.'},
+      {title:'Fundació Joan Miró',location:'Parc de Montjuïc, s/n, Barcelona',desc:'10.000 obras de Miró num edifício de Sert; escultura no jardim exterior.'},
+      {title:'Bunkers del Carmel',location:'Carrer de Marià Labèrnia, s/n, Barcelona',desc:'Bunkers da Guerra Civil com a melhor vista panorâmica de Barcelona.'},
+      {title:'El Born & Palau de la Música',location:'Carrer del Palau de la Música, 4-6, El Born, Barcelona',desc:'Bairro de design com o palácio de Domènech i Montaner — Art Nouveau.'}
+    ],
+    afternoonCafes:[
+      {title:'Pastelería Hofmann',location:'Carrer dels Flassaders, 44, El Born, Barcelona',desc:'Escola de pastelaria com loja; croissants e ensaïmades artesanais.'},
+      {title:'Granja M. Viader',location:'Carrer d\'en Xuclà, 4-6, Raval, Barcelona',desc:'Granja histórica de 1870 inventora do Cacaolat; fartons e orxata.'},
+      {title:'Escribà — La Rambla',location:'La Rambla, 83, Barcelona',desc:'Pastelaria de 1906 com fachada modernista; bombons e pasteles.'},
+      {title:'Bar del Pla',location:'Carrer de la Montcada, 2, El Born, Barcelona',desc:'Croquetes de jamón premiadas e vermut no coração do El Born.'}
+    ],
+    sunsets:[
+      {title:'Bunkers del Carmel — Pôr do Sol',location:'Carrer de Marià Labèrnia, s/n, Barcelona',desc:'Vista 360° de Barcelona; local favorito dos barceloneses ao entardecer.'},
+      {title:'Mirador del Migdia — Montjuïc',location:'Carretera de Montjuïc, Montjuïc, Barcelona',desc:'Mirador escondido no sul de Montjuïc; tramonto sobre o mar Mediterrâneo.'},
+      {title:'Barceloneta Beach — Hora Dourada',location:'Passeig Marítim de la Barceloneta, Barcelona',desc:'O sol mergulha no mar ao final da praia urbana mais famosa da Europa.'},
+      {title:'Tibidabo — Vista Panorâmica',location:'Plaça del Tibidabo, 3, Barcelona',desc:'Parque de diversões histórico no pico com vista de toda a cidade.'}
+    ],
+    dinners:[
+      {title:'Bar Calders — Sant Antoni',location:'Carrer del Parlament, 25, Sant Antoni, Barcelona',desc:'Bistrô de bairro; torrades gourmet, hummus e vinho natural local.'},
+      {title:'La Mar Salada',location:'Passeig de Joan de Borbó, 58, Barceloneta, Barcelona',desc:'Frutos do mar frescos na frente do mar; arròs negre e fideuà.'},
+      {title:'Bodega Sepúlveda',location:'Carrer de Sepúlveda, 173, Eixample, Barcelona',desc:'Bodega histórica; vinho direto da bota, patatas bravas e pimientos.'},
+      {title:'Quimet & Quimet',location:'Carrer del Poeta Cabanyes, 25, Poble Sec, Barcelona',desc:'Bar de conservas e montaditos; aberto só ao almoço e fins de semana.'}
+    ],
+    nightlife:[
+      {title:'El Born à Noite',location:'Carrer del Rec, El Born, Barcelona',desc:'Rua mais animada de Barcelona noite adentro; cava e coquetéis.'},
+      {title:'Barceloneta Beach Clubs',location:'Passeig Marítim, Barceloneta, Barcelona',desc:'Clubs à beira-mar com DJs; o Pacha e o Opium abrem ao entardecer.'},
+      {title:'Razzmatazz',location:'Carrer dels Almogàvers, 122, Poblenou, Barcelona',desc:'5 salas num armazém — rock, techno, indie e pop até o amanhecer.'},
+      {title:'Bar Marsella',location:'Carrer de Sant Pau, 65, Raval, Barcelona',desc:'Bar mais antigo de Barcelona (1820); absinto e garrafas empoeiradas.'}
+    ]
+  },
+  /* ── ARGENTINA / BUENOS AIRES ───────────────────────────────── */
+  argentina:{
+    keys:['argentina','buenos aires','bsas'],
+    flag:'🇦🇷',color:'#1D9E75',lat:-34.61,lng:-58.38,
+    cafes:[
+      {title:'Café Tortoni',location:'Av. de Mayo, 829, Monserrat, Buenos Aires',desc:'Café histórico de 1858 com tango ao vivo; submarino (chocolate quente) icônico.'},
+      {title:'El Federal',location:'Carlos Calvo, 599, San Telmo, Buenos Aires',desc:'Bar histórico de 1864 em esquina de San Telmo; café e medialunas.'},
+      {title:'Ninina Bakery',location:'Gorriti, 4738, Palermo Soho, Buenos Aires',desc:'Padaria artesanal de Palermo; croissants, cookies e café de origem.'},
+      {title:'La Poesía',location:'Chile, 502, San Telmo, Buenos Aires',desc:'Bar literário com fotos de Borges; café simples e atmosfera portenha.'}
+    ],
+    morningAttractions:[
+      {title:'Casa Rosada & Plaza de Mayo',location:'Balcarce, 50, Monserrat, Buenos Aires',desc:'Palácio presidencial rosa; palco histórico de Evita e manifestações.'},
+      {title:'Caminito — La Boca',location:'Caminito, La Boca, Buenos Aires',desc:'Rua-museu com casas coloridas de chapas; artistas e murais de Quinquela.'},
+      {title:'Mercado de San Telmo',location:'Carlos Calvo, 430, San Telmo, Buenos Aires',desc:'Mercado coberto de 1897 com antiques, tapas e cafés.'},
+      {title:'MALBA',location:'Figueroa Alcorta, 3415, Palermo, Buenos Aires',desc:'Museu de Arte Latino-americana; Kahlo, Tarsila do Amaral, Di Cavalcanti.'}
+    ],
+    lunches:[
+      {title:'Don Julio',location:'Guatemala, 4699, Palermo, Buenos Aires',desc:'Melhor parrilla de Buenos Aires segundo o San Pellegrino; reserva essencial.'},
+      {title:'La Cabrera',location:'José Antonio Cabrera, 5099, Palermo, Buenos Aires',desc:'Entrecot enorme com 15 guarnições; chegar às 12h30 para evitar fila.'},
+      {title:'El Preferido de Palermo',location:'Jorge Luis Borges, 2108, Palermo, Buenos Aires',desc:'Pulpería histórica; empanadas, tortas fritas e vinho patero.'},
+      {title:'La Brigada',location:'Estados Unidos, 465, San Telmo, Buenos Aires',desc:'Parrilla clássica de San Telmo; bife de chorizo e chimichurri da casa.'}
+    ],
+    afternoonAttractions:[
+      {title:'Cemitério da Recoleta',location:'Junín, 1760, Recoleta, Buenos Aires',desc:'Cidade dos mortos com mausoléus art déco; tumba de Evita Perón.'},
+      {title:'Palermo Soho & Hollywood',location:'Honduras, Palermo, Buenos Aires',desc:'Bairro de design com galerias, concept stores e street art de qualidade.'},
+      {title:'Puerto Madero',location:'Av. Alicia Moreau de Justo, Puerto Madero, Buenos Aires',desc:'Área portuária revitalizada; Puente de la Mujer de Calatrava.'},
+      {title:'Reserva Ecológica Costanera Sur',location:'Av. Tristán Achaval Rodríguez, 1550, Buenos Aires',desc:'Reserva natural de 350 ha às margens do Río de la Plata; pássaros.'}
+    ],
+    afternoonCafes:[
+      {title:'Lattente',location:'El Salvador, 5765, Palermo, Buenos Aires',desc:'Café de especialidade líder em Buenos Aires; pourover e pastries.'},
+      {title:'Proper',location:'Humboldt, 1975, Palermo, Buenos Aires',desc:'Brunch cult de Palermo; pancakes, avocado toast e cold brew.'},
+      {title:'Chalet',location:'Costa Rica, 5530, Palermo Soho, Buenos Aires',desc:'Pâtisserie francesa em Palermo; millefeuille, éclair e petit gâteau.'},
+      {title:'Felicidad — Heladería',location:'Thames, 1426, Palermo, Buenos Aires',desc:'Sorveteria artesanal italiana; dulce de leche granizado é referência.'}
+    ],
+    sunsets:[
+      {title:'Puerto Madero — Pôr do Sol',location:'Av. Alicia Moreau de Justo, Puerto Madero, Buenos Aires',desc:'O Río de la Plata se tinge de laranja; luz única no horizonte infinito.'},
+      {title:'Reserva Ecológica — Pôr do Sol',location:'Av. Tristán Achaval Rodríguez, 1550, Buenos Aires',desc:'Silêncio e pássaros com o sol descendo sobre o rio mais largo do mundo.'},
+      {title:'Mirador Planetario Galileo Galilei',location:'Av. Sarmiento, Palermo, Buenos Aires',desc:'Vista do parque de Palermo dourado ao entardecer.'},
+      {title:'Terraza Sky Bar — Roof',location:'Arenales, 1664, Recoleta, Buenos Aires',desc:'Rooftop com vista para os arranha-céus de Recoleta e o pôr do sol.'}
+    ],
+    dinners:[
+      {title:'Tegui',location:'Costa Rica, 5852, Palermo, Buenos Aires',desc:'Cozinha criativa argentina num casarão industrial; tasting menu surpreendente.'},
+      {title:'Chila',location:'Alicia Moreau de Justo, 1160, Puerto Madero, Buenos Aires',desc:'Fine dining à beira do porto; parrilla de peixe e vinhos da Patagônia.'},
+      {title:'El Baqueano',location:'Chile, 499, San Telmo, Buenos Aires',desc:'Fauna local no prato; yacaré, ciervo e guanaco preparados com técnica.'},
+      {title:'La Carnicería',location:'Thames, 2317, Palermo, Buenos Aires',desc:'Açougue-restaurante de Palermo; costeleta gigante e empanadas fritas.'}
+    ],
+    nightlife:[
+      {title:'Milonga La Catedral',location:'Sarmiento, 4006, Balvanera, Buenos Aires',desc:'Milonga num armazém abandonado; tango às sextas e sábados à meia-noite.'},
+      {title:'Bar Británico',location:'Brasil, 399, San Telmo, Buenos Aires',desc:'Bar aberto 24h desde 1928; escritores, boêmios e insones históricos.'},
+      {title:'Florería Atlántico',location:'Arroyo, 872, Retiro, Buenos Aires',desc:'Speakeasy embaixo de uma floricultura; melhor cocktail bar da América do Sul.'},
+      {title:'Niceto Club',location:'Niceto Vega, 5510, Palermo, Buenos Aires',desc:'Clube indie-rock de Palermo; shows ao vivo nas sextas antes da pista.'}
+    ]
+  },
+  /* ── GREECE / ATHENS ────────────────────────────────────────── */
+  grecia:{
+    keys:['grecia','greece','grécia','atenas','athens','santorini','mykonos','thessaloniki'],
+    flag:'🇬🇷',color:'#2D6BC4',lat:37.97,lng:23.72,
+    cafes:[
+      {title:'Taf — The Athenian Factory',location:'7 Mezonos St, Psiri, Athens',desc:'Torrador boutique em armazém industrial; espresso e filtrado de qualidade.'},
+      {title:'Little Kook',location:'17 Karaiskaki St, Psiri, Athens',desc:'Café de conto de fadas com decoração de Alice no País das Maravilhas.'},
+      {title:'Mokka',location:'Omirou 1 & Sina St, Kolonaki, Athens',desc:'Tradicional kafenio com café turco e loukoumades quentes.'},
+      {title:'Couleur Locale',location:'3 Normanou St, Monastiraki, Athens',desc:'Rooftop café com vista para a Acropólis; frappe e hora azul perfeita.'}
+    ],
+    morningAttractions:[
+      {title:'Acropolis & Parthenon',location:'Acropolis, Monastiraki, Athens',desc:'Patrimônio da humanidade; chegue às 8h para luz de manhã e silêncio.'},
+      {title:'Museu da Acrópole',location:'Dionysiou Areopagitou 15, Athens',desc:'Frisos originais do Parthenon em museu de vidro sobre escavações visíveis.'},
+      {title:'Agora Antiga de Atenas',location:'24 Adrianou St, Monastiraki, Athens',desc:'Coração da democracia antiga; Templo de Hefesto é o mais preservado.'},
+      {title:'Monastiraki Flea Market',location:'Monastiraki Square, Athens',desc:'Mercado às ruas com bronze, ícones, vinil e velharias gregas.'}
+    ],
+    lunches:[
+      {title:'Diporto Agoras',location:'9 Theatrou Sq, Psiri, Athens',desc:'Taberna escondida sem menu nem cardápio; sopa de grão-de-bico e vinho da barrica.'},
+      {title:'Klimataria',location:'2 Theatrou Sq, Athens',desc:'Taverna de 1927; moussaka, stifado e retsina em ambiente musical.'},
+      {title:'Avocado Athens',location:'30 Nikis St, Syntagma, Athens',desc:'Almoço vegetariano e vegano sem perder a sabor mediterrâneo.'},
+      {title:'Taverna tou Psara',location:'16 Erechtheos St, Plaka, Athens',desc:'Taverna com varanda sobre a Plaka; grelhados de polvo e frutos do mar.'}
+    ],
+    afternoonAttractions:[
+      {title:'Plaka District',location:'Plaka, Athens',desc:'Bairro neoclássico sob a Acropólis; ruas de pedra, igrejas e bougainvillea.'},
+      {title:'Museu Benaki',location:'1 Koumbari St, Kolonaki, Athens',desc:'Melhor museu para entender a história grega de 3000 anos.'},
+      {title:'Templo de Zeus Olímpico',location:'Vasilissis Olgas 1, Athens',desc:'15 colunas coríntias do templo mais grandioso da Antiguidade.'},
+      {title:'Anafiotika — Barrio Cicládico',location:'Anafiotika, Plaka, Athens',desc:'Bairro branco com ruas estreitas que parecem Santorini no centro de Atenas.'}
+    ],
+    afternoonCafes:[
+      {title:'Couleur Locale Rooftop',location:'3 Normanou St, Monastiraki, Athens',desc:'O café com a melhor vista da Acrópole ao fim de tarde — imperdível.'},
+      {title:'Heteroclito Wine Bar',location:'3 Fokionos & Petraki St, Syntagma, Athens',desc:'Vinhos naturais gregos e petiscos mediterrâneos numa adega charmosa.'},
+      {title:'Fine Art Café',location:'45 Kydathinaion St, Plaka, Athens',desc:'Café cultural na Plaka com arte local e varandas sobre a rua.'},
+      {title:'Yiasemi Café',location:'23 Mnisikleous St, Plaka, Athens',desc:'Café encantador em escadaria da Plaka; frappé e loukoumades.'}
+    ],
+    sunsets:[
+      {title:'Areopagus Hill — Pôr do Sol',location:'Areopagus, Athens',desc:'Rochedo bíblico ao lado da Acrópole; pôr do sol sobre o Golfo Sarônico.'},
+      {title:'Lycabettus Hill — Topo',location:'Lycabettus, Athens',desc:'Ponto mais alto de Atenas (277m); toda a cidade e o mar visíveis.'},
+      {title:'Filopappou Hill',location:'Filopappou, Athens',desc:'Colina com monumento antigo e vista frontal para a Acrópole dourada.'},
+      {title:'A for Athens Rooftop',location:'2-4 Miaouli St, Monastiraki, Athens',desc:'Rooftop bar com a Acrópole iluminada como pano de fundo; cocktails.'}
+    ],
+    dinners:[
+      {title:'Spondi',location:'5 Pyrronos St, Pagrati, Athens',desc:'2 estrelas Michelin; nouvelle cuisine grega em jardim iluminado.'},
+      {title:'Steki tou Ilia',location:'5 Eptachalkou St, Thission, Athens',desc:'Referência para costeletas de cordeiro grelhadas — sem menu, só parillas.'},
+      {title:'Vezene',location:'11 Varnava Square, Pagrati, Athens',desc:'Cozinha grega criativa; polvo, taramas e mezedakia modernos.'},
+      {title:'Hytra',location:'107 Syngrou Ave, Neos Kosmos, Athens',desc:'1 estrela Michelin com tasting menu de produtos gregos sazonais.'}
+    ],
+    nightlife:[
+      {title:'Monastiraki Square',location:'Monastiraki, Athens',desc:'Praça animada com bares ao ar livre e vista para a Acrópole iluminada.'},
+      {title:'Gazi — Kerameikos',location:'Iera Odos, Gazi, Athens',desc:'Bairro de clubes em antigas fábricas de gás; techno e house até manhã.'},
+      {title:'Six d.o.g.s',location:'6-8 Avramiotou St, Monastiraki, Athens',desc:'Espaço cultural multifunção; jardim, bar, concerts e arte urbana.'},
+      {title:'A for Athens Rooftop',location:'2-4 Miaouli St, Monastiraki, Athens',desc:'Melhor rooftop da cidade; Acropólis iluminada e cocktails criativos.'}
+    ]
+  },
+  /* ── THAILAND / BANGKOK ─────────────────────────────────────── */
+  tailandia:{
+    keys:['tailandia','thailand','bangkok','tailândia','phuket','chiang mai','chiang rai','krabi'],
+    flag:'🇹🇭',color:'#B44D6E',lat:13.75,lng:100.52,
+    cafes:[
+      {title:'Rocket Coffeebar S49',location:'149 Sukhumvit Soi 49, Vadhana, Bangkok',desc:'Café australiano; flat white cremoso e brunch saudável em Sukhumvit.'},
+      {title:'Ceresia Coffee Roasters',location:'120/1 Ladprao Soi 8, Chatuchak, Bangkok',desc:'Torrador local premiado; filtrado de origens tailandesas de Chiang Rai.'},
+      {title:'Floral Cafe at Napasorn',location:'67 Tanao Rd, Phra Nakhon, Bangkok',desc:'Café-jardim florido perto do Grand Palace; instagramável e gostoso.'},
+      {title:'Roast Coffee',location:'The Commons, Sukhumvit Soi 55, Bangkok',desc:'Rooftop café no The Commons; brunch e flat white com vista da cidade.'}
+    ],
+    morningAttractions:[
+      {title:'Wat Phra Kaew & Grand Palace',location:'Na Phra Lan Rd, Phra Nakhon, Bangkok',desc:'Complexo sagrado com o Buda Esmeralda; chegue às 8h para evitar calor.'},
+      {title:'Wat Arun — Templo da Aurora',location:'158 Thanon Wang Doem, Bangkok',desc:'Spira de mosaico de porcelana na margem do Chao Phraya — fotogênico.'},
+      {title:'Chatuchak Weekend Market',location:'Kampaengphet 2 Rd, Chatuchak, Bangkok',desc:'8.000 bancas — maior mercado de fim de semana do mundo; sábado e domingo.'},
+      {title:'Wat Pho — Buda Reclinado',location:'2 Sanam Chai Rd, Phra Nakhon, Bangkok',desc:'Buda dourado de 46m deitado; local de origem da massagem tailandesa.'}
+    ],
+    lunches:[
+      {title:'Pad Thai Thip Samai',location:'313 Maha Chai Rd, Phra Nakhon, Bangkok',desc:'O Pad Thai mais famoso de Bangkok; na folha de omelete, com camarão.'},
+      {title:'Raan Jay Fai',location:'327 Mahachai Rd, Bangkok',desc:'1 estrela Michelin; chef de óculos de mergulho faz pad kee mao na wok.'},
+      {title:'Or Tor Kor Market',location:'101 Kamphaeng Phet Rd, Chatuchak, Bangkok',desc:'Mercado premium com mango sticky rice, curries e frutas exóticas.'},
+      {title:'Err Urban Rustic Thai',location:'394/35 Maharaj Rd, Phra Nakhon, Bangkok',desc:'Street food tailandesa elevada; khai jiao e larb em ambiente moderno.'}
+    ],
+    afternoonAttractions:[
+      {title:'Jim Thompson House',location:'6 Kasem San 2 Lane, Pathum Wan, Bangkok',desc:'Casa-museu de seda tailandesa em jardim; arquitetura colonial assombrosa.'},
+      {title:'Lumphini Park',location:'Rama IV Rd, Pathumwan, Bangkok',desc:'Pulmão verde de Bangkok; monitores de água, pedalinhos e lagoa.'},
+      {title:'Asiatique The Riverfront',location:'2194 Charoen Krung Rd, Bangkok',desc:'Mercado noturno à beira do Chao Phraya; roda-gigante e street food.'},
+      {title:'MBK Center & Siam Paragon',location:'444 Phaya Thai Rd, Pathum Wan, Bangkok',desc:'Shopping ultra-completo; eletrônicos, comida tailandesa e moda local.'}
+    ],
+    afternoonCafes:[
+      {title:'After You Dessert Café Thong Lo',location:'113/1 Thong Lo Soi 9, Bangkok',desc:'Honey toast e kakigori japonês; fila no fim de tarde, vale esperar.'},
+      {title:'Nuttapom Coconut Ice Cream',location:'Wat Pho, Sanam Chai Rd, Bangkok',desc:'Sorvete de coco fresco servido no próprio coco, ao lado do Wat Pho.'},
+      {title:'MuMu Cafe',location:'Ari Soi 4, Phahon Yothin, Bangkok',desc:'Café-jardim em Ari com gatos, bolo de matcha e horchata tailandesa.'},
+      {title:'Binlabb Artisan Icecream',location:'Ari Square, Phahon Yothin, Bangkok',desc:'Sorvete artesanal com ingredientes tailandeses; tom yum e butterfly pea.'}
+    ],
+    sunsets:[
+      {title:'Wat Arun ao Pôr do Sol',location:'158 Thanon Wang Doem, Bangkok',desc:'Vista do outro lado do rio vendo a spira dourada com o sol descendo.'},
+      {title:'Sky Bar — Lebua at State Tower',location:'1055 Si Lom Rd, Bangrak, Bangkok',desc:'Bar do Hangover 2 a 250m; caipirinha e Bangkok brilhando abaixo.'},
+      {title:'Asiatique Riverfront — Entardecer',location:'2194 Charoen Krung Rd, Bangkok',desc:'Roda-gigante e Chao Phraya dourado com barcos de cauda passando.'},
+      {title:'Iconsiam Riverside Terrace',location:'299 Charoen Nakhon Rd, Khlong Ton Sai, Bangkok',desc:'Terraço do mega shopping com vista cinematográfica do rio.'}
+    ],
+    dinners:[
+      {title:'Gaggan Anand',location:'68/1 Soi Langsuan, Lumphini, Bangkok',desc:'#1 da Ásia em 2015-19; 25 pratos servidos apenas com emoji no menu.'},
+      {title:'Nahm',location:'27 South Sathorn Rd, Sathorn, Bangkok',desc:'Cozinha tailandesa clássica de David Thompson, 1 estrela Michelin.'},
+      {title:'Supanniga Eating Room',location:'160/11 Sukhumvit Soi 55, Bangkok',desc:'Receitas da avó da chef em ambiente moderno; massaman e khao chae.'},
+      {title:'Paste Bangkok',location:'3 Wireless Rd, Lumphini, Bangkok',desc:'1 estrela Michelin; releituras refinadas de curry tailandês de panela de barro.'}
+    ],
+    nightlife:[
+      {title:'Khao San Road',location:'Khao San Rd, Phra Nakhon, Bangkok',desc:'A rua mais famosa da mochilagem mundial; buckets, reggae e alegria.'},
+      {title:'Sky Bar — Lebua Tower',location:'1055 Si Lom Rd, Bangrak, Bangkok',desc:'Bar ao ar livre a 250m — Hangovers reais e vista de Bangkok à noite.'},
+      {title:'Levels Club & Lounge',location:'Aloft Bangkok, Sukhumvit Soi 11, Bangkok',desc:'Pool rooftop com DJ; público jovem local e internacional toda noite.'},
+      {title:'Sing Sing Theater',location:'45 Sukhumvit Soi 45, Bangkok',desc:'Bar-clube com decoração de Shanghai dos anos 30; uma das melhores noites de Bangkok.'}
+    ]
+  },
+  /* ── USA / NEW YORK ─────────────────────────────────────────── */
+  newyork:{
+    keys:['new york','nova york','nyc','manhattan','brooklyn','eua','estados unidos','miami','florida','orlando','los angeles','chicago'],
+    flag:'🇺🇸',color:'#2D6BC4',lat:40.71,lng:-74.01,
+    cafes:[
+      {title:'Blue Bottle Coffee Chelsea Market',location:'75 9th Ave, Chelsea Market, New York',desc:'Café de especialidade dentro do Chelsea Market; drip coffee e latte.'},
+      {title:'Stumptown Coffee Roasters',location:'30 W 8th St, Greenwich Village, New York',desc:'Torrador de Portland em Nova York; red eye e nitro cold brew.'},
+      {title:'Cafe Grumpy',location:'224 W 20th St, Chelsea, New York',desc:'Favorito dos nova-iorquinos; flat white e filter coffee sem frescura.'},
+      {title:'Joe Coffee Company',location:'405 W 23rd St, Chelsea, New York',desc:'Torrador local do West Village; rostas únicas de fazendas diretas.'}
+    ],
+    morningAttractions:[
+      {title:'Central Park',location:'59th to 110th St, Manhattan, New York',desc:'843 acres de parque urbano; Belvedere Castle, Bow Bridge e Strawberry Fields.'},
+      {title:'The Metropolitan Museum of Art',location:'1000 5th Ave, Manhattan, New York',desc:'Maior museu dos EUA; 5.000 anos de arte em 2 milhões de objetos.'},
+      {title:'Brooklyn Bridge',location:'Brooklyn Bridge, New York',desc:'Ícone de aço de 1883; caminhe da manhã para ver Manhattan brilhar.'},
+      {title:'The High Line',location:'Gansevoort St to 34th St, West Side, Manhattan',desc:'Parque elevado em ferrovia abandonada com jardins e arte pública.'}
+    ],
+    lunches:[
+      {title:'Katz\'s Delicatessen',location:'205 E Houston St, Lower East Side, New York',desc:'Pastrami on rye desde 1888 — o sándwich mais famoso dos EUA.'},
+      {title:'Joe\'s Pizza',location:'7 Carmine St, Greenwich Village, New York',desc:'A fatia de pizza nova-iorquina perfeita; dobrar ao meio é obrigatório.'},
+      {title:'Eataly Flatiron',location:'200 5th Ave, Flatiron, New York',desc:'Mercado italiano com pastas frescas, pizzas e cafeteria Lavazza.'},
+      {title:'Shake Shack Madison Square Park',location:'Madison Ave & 23rd St, Flatiron, New York',desc:'O original do Shake Shack — ShackBurger e frozen custard.'}
+    ],
+    afternoonAttractions:[
+      {title:'MoMA — Museum of Modern Art',location:'11 W 53rd St, Midtown, New York',desc:'Picasso, Warhol, Monet — coleção de arte moderna mais importante do mundo.'},
+      {title:'The EDGE — Hudson Yards',location:'30 Hudson Yards, Midtown West, New York',desc:'Plataforma de vidro a 335m com vista 360° de Manhattan e New Jersey.'},
+      {title:'Brooklyn Bridge Park',location:'334 Furman St, Brooklyn Heights, New York',desc:'Parque à beira do East River com as melhores fotos do skyline de Manhattan.'},
+      {title:'Times Square',location:'Times Square, Midtown, New York',desc:'O cruzamento mais filmado do mundo; néon, música e energia 24h.'}
+    ],
+    afternoonCafes:[
+      {title:'Levain Bakery',location:'167 W 74th St, Upper West Side, New York',desc:'Cookie de 170g que derrete; chocolate chip walnut é o original.'},
+      {title:'Magnolia Bakery',location:'401 Bleecker St, West Village, New York',desc:'Cupcakes de Sex and the City; buttercream e banana pudding caseiros.'},
+      {title:'Doughnut Plant',location:'379 Grand St, Lower East Side, New York',desc:'Criador do donut quadrado; rosquinhas artesanais com recheios creativos.'},
+      {title:'Dominique Ansel Bakery',location:'189 Spring St, SoHo, New York',desc:'Inventor do Cronut (croissant+donut); reserva para pastries únicos.'}
+    ],
+    sunsets:[
+      {title:'Brooklyn Bridge Park — Pier 1',location:'1 Water St, Brooklyn Heights, New York',desc:'Vista frontal do Lower Manhattan ao pôr do sol — melhor ângulo da cidade.'},
+      {title:'Top of the Rock',location:'30 Rockefeller Plaza, Midtown, New York',desc:'Observatório do Rockefeller Center com o Empire State em frente.'},
+      {title:'One World Observatory',location:'285 Fulton St, Lower Manhattan, New York',desc:'Topo do prédio mais alto do hemisfério oeste; 360° ao entardecer.'},
+      {title:'The EDGE — Hudson Yards',location:'30 Hudson Yards, Midtown West, New York',desc:'Plataforma de vidro saliente: Nova York dourada abaixo dos seus pés.'}
+    ],
+    dinners:[
+      {title:'Carbone',location:'181 Thompson St, Greenwich Village, New York',desc:'Italiana red-sauce de luxo; rigatoni vodka e veal parmesan lendários.'},
+      {title:'Le Bernardin',location:'155 W 51st St, Midtown, New York',desc:'3 estrelas Michelin de frutos do mar; cru de atum com foie gras.'},
+      {title:'Lilia',location:'567 Union Ave, Williamsburg, Brooklyn, New York',desc:'Massas artesanais da chef Missy Robbins; abrimos cacio e pepe.'},
+      {title:'Russ & Daughters Cafe',location:'127 Orchard St, Lower East Side, New York',desc:'Café do lendário appetizing store; salmão defumado e bagel com schmear.'}
+    ],
+    nightlife:[
+      {title:'The Dead Rabbit',location:'30 Water St, Financial District, New York',desc:'Melhor cocktail bar do mundo em 2016; Irish punch e flip histórico.'},
+      {title:'Employees Only',location:'510 Hudson St, West Village, New York',desc:'Speakeasy de destilados handcrafted; psychic at the door às sextas.'},
+      {title:'Bemelmans Bar — Carlyle Hotel',location:'35 E 76th St, Upper East Side, New York',desc:'Piano bar do Carlyle Hotel; murais do Ludwig Bemelmans e jazz ao vivo.'},
+      {title:'Brooklyn Mirage',location:'140 Stewart Ave, Bushwick, Brooklyn, New York',desc:'Open-air techno club de Bushwick; DJs mundiais num armazém mágico.'}
+    ]
+  },
+  /* ── GRAMADO ────────────────────────────────────────────────── */
+  gramado:{keys:['gramado','canela','serra gaucha','bento gonçalves'],flag:'🇧🇷',color:'#2D6BC4',lat:-29.38,lng:-50.87,cafes:[{title:'Café & Cantina Servati',location:'Rua Coberta, 18, Gramado',desc:'Café tradicional na Rua Coberta com cucas e cafés artesanais.'},{title:'Caracol Café',location:'Av. das Hortênsias, Gramado',desc:'Café charmoso com vista para as hortênsias da avenida.'},{title:'Padaria Gramadense',location:'Av. Borges de Medeiros, Gramado',desc:'Padaria clássica com croissants e café colonial.'},{title:'Café Colônia',location:'Rua Garibaldi, Gramado',desc:'Café no estilo alemão com cucas e strudel artesanal.'}],morningAttractions:[{title:'Lago Negro',location:'Av. das Hortênsias, Gramado',desc:'Lago rodeado de hortênsias e pinheiros, passeio de pedalinho.'},{title:'Aldeia do Papai Noel',location:'Av. Victor Graeff, Gramado',desc:'Atração temática icônica com decoração natalina permanente.'},{title:'Parque Knorr',location:'Rua Leopoldo Rosenfeld, Gramado',desc:'Parque com lago e jardins floridos para caminhada matinal.'},{title:'Mini Mundo',location:'Rua Emílio Bertolucci, Gramado',desc:'Parque temático com réplicas em miniatura de monumentos.'}],lunches:[{title:'Gasthof Gramado',location:'Av. Borges de Medeiros, 3086',desc:'Comida alemã clássica: eisbein, marreco recheado e chucrute.'},{title:'Piccolo Mondo',location:'Rua Garibaldi, Gramado',desc:'Massas artesanais e pratos italianos em ambiente aconchegante.'},{title:'Restaurante Edelweiss',location:'Rua da Carrara, Gramado',desc:'Comida típica alemã com fondue no frio.'},{title:'La Caceria',location:'Rua Leopoldo Rosenfeld, Gramado',desc:'Churrasco gaúcho e carnes nobres grelhadas.'}],afternoonAttractions:[{title:'Fábrica de Chocolate Prawer',location:'Av. Borges de Medeiros, Gramado',desc:'Chocolateria com tour e degustação de chocolates.'},{title:'Snowland',location:'Av. das Hortênsias, 4000, Gramado',desc:'Parque de neve indoor, único da América do Sul.'},{title:'Hollywood Dream Cars',location:'Av. das Hortênsias, Gramado',desc:'Museu com carros clássicos de filmes e celebridades.'},{title:'Castelinho Caracol',location:'Av. Pe. Claro Monteiro, Canela',desc:'Castelo medieval com vista para o vale em Canela.'}],afternoonCafes:[{title:'Chocolates Lugano',location:'Rua Coberta, Gramado',desc:'Chocolateria suíça com degustação e loja.'},{title:'Sorvetes Lugano',location:'Av. Borges de Medeiros, Gramado',desc:'Sorvetes artesanais em sabores únicos.'},{title:'Cantina Servati — Doceria',location:'Rua Coberta, Gramado',desc:'Cucas, strudel e chocolates numa tarde fria.'},{title:'Via Láctea Café',location:'Rua Garibaldi, Gramado',desc:'Café especial com vista para as montanhas da Serra.'}],sunsets:[{title:'Mirante do Vale',location:'Estrada do Quilombo, Gramado',desc:'Vista panorâmica da Serra Gaúcha ao entardecer.'},{title:'Parque do Caracol — Vista',location:'RS-466, Canela',desc:'Vista para a Cascata do Caracol e o vale florestal.'},{title:'Pôr do Sol no Lago Negro',location:'Av. das Hortênsias, Gramado',desc:'Reflexo do sol no lago cercado de pinheiros.'},{title:'Mirante da Ferradura',location:'RS-115, Nova Petrópolis',desc:'Pôr do sol épico na Serra Gaúcha.'}],dinners:[{title:'Striatto Gramado',location:'Av. Borges de Medeiros, Gramado',desc:'Fondue clássico de queijo e chocolate em noite fria.'},{title:'Restaurante Saint Andrews',location:'Rua Leopoldo Rosenfeld, Gramado',desc:'Gastronomia refinada com ingredientes serranos.'},{title:'Il Terrazzo',location:'Av. das Hortênsias, Gramado',desc:'Jantar italiano com massas artesanais e jardim.'},{title:'Chico Loco Bar & Grill',location:'Rua Coberta, Gramado',desc:'Hambúrgueres artesanais e chopp gelado.'}],nightlife:[{title:'Rua Coberta à Noite',location:'Rua Coberta, Gramado',desc:'Calçadão iluminado com bares e músicos de rua.'},{title:'Bar do Patrício',location:'Av. Borges de Medeiros, Gramado',desc:'Bar animado com cerveja artesanal gaúcha.'},{title:'Gramado Beer House',location:'Rua Garibaldi, Gramado',desc:'Pub com cervejas artesanais da Serra Gaúcha.'},{title:'Piazza de Gramado',location:'Centro, Gramado',desc:'Praça principal animada com lojas e cafés noturnos.'}]},
+  florianopolis:{keys:['florianopolis','florianópolis','floripa','santa catarina'],flag:'🇧🇷',color:'#1D9E75',lat:-27.59,lng:-48.55,cafes:[{title:'Café do Mercado Público',location:'Mercado Público, Centro',desc:'Café histórico dentro do Mercado Público colonial.'},{title:'Pão & Arte Padaria',location:'Av. Beira Mar Norte',desc:'Padaria artesanal com vista para a Baía Norte.'},{title:'Café Cultura',location:'Rua Tenente Silveira, Centro',desc:'Café cultural com livros, exposições e especialidades.'},{title:'Cafezinho da Lagoa',location:'Av. das Rendeiras, Lagoa',desc:'Café charmoso à beira da Lagoa da Conceição.'}],morningAttractions:[{title:'Mercado Público de Florianópolis',location:'Praça XV de Novembro, Centro',desc:'Mercado histórico de 1851 com barracas e cultura local.'},{title:'Fortaleza de São José da Ponta Grossa',location:'Ponta Grossa',desc:'Fortaleza do século XVIII com vista para o mar.'},{title:'Lagoa da Conceição',location:'Lagoa da Conceição',desc:'Lagoa cercada por dunas e mata atlântica.'},{title:'Praia Mole — Manhã',location:'Praia Mole',desc:'Praia badalada, calma de manhã com mar azul-turquesa.'}],lunches:[{title:'Armação Restaurante',location:'Praia da Armação',desc:'Frutos do mar frescos com vista para o mar.'},{title:'Box 32 — Mercado Público',location:'Mercado Público, Centro',desc:'Camarão frito e mariscada clássica.'},{title:'Rancho Açoriano',location:'Ribeirão da Ilha',desc:'Ostra fresca e caldeirada no sul da ilha.'},{title:'Macarronada Italiana',location:'Av. Beiramar Norte',desc:'Massas frescas com frutos do mar.'}],afternoonAttractions:[{title:'Dunas da Joaquina',location:'Praia da Joaquina',desc:'Dunas para sandboard com vista para o Atlântico.'},{title:'Ponte Hercílio Luz',location:'Centro',desc:'Ponte histórica e símbolo de Florianópolis.'},{title:'Praia dos Ingleses',location:'Ingleses, Norte da Ilha',desc:'Praia extensa e tranquila no norte.'},{title:'Museu de Arte de Santa Catarina',location:'Centro',desc:'Acervo catarinense e exposições contemporâneas.'}],afternoonCafes:[{title:'Açaí da Lagoa',location:'Av. das Rendeiras, Lagoa',desc:'Açaí cremoso com granola e frutas à beira da lagoa.'},{title:'Sorvetes do Mercado',location:'Mercado Público',desc:'Sorvetes artesanais de sabores tropicais.'},{title:'Café e Crepe Beira-Lagoa',location:'Lagoa da Conceição',desc:'Crepes e cafés em frente à lagoa.'},{title:'Confeitaria Sto. Antônio',location:'Rua Esteves Júnior, Centro',desc:'Bolos e doces caseiros numa confeitaria histórica.'}],sunsets:[{title:'Morro da Cruz — Pôr do Sol',location:'Morro da Cruz, Centro',desc:'Melhor vista de Florianópolis: ilha toda e o pôr do sol.'},{title:'Praia da Daniela — Entardecer',location:'Praia Daniela, Norte',desc:'Praia tranquila, perfeita para o pôr do sol.'},{title:'Orla da Beira Mar Norte',location:'Av. Beiramar Norte',desc:'Calçadão com pôr do sol deslumbrante.'},{title:'Ponta das Canas',location:'Ponta das Canas',desc:'Praia com luz dourada e vista para a Ilha do Arvoredo.'}],dinners:[{title:'Ostradamus',location:'Rodovia Baldicero Filomeno, Ribeirão da Ilha',desc:'Ostras frescas e frutos do mar — o mais famoso de Floripa.'},{title:'Pirão Restaurante',location:'Av. Beiramar Norte',desc:'Moqueca e pirão de peixe com visual da Baía Norte.'},{title:'Toca da Garoupa',location:'Lagoa da Conceição',desc:'Peixe grelhado e frutos do mar na orla da Lagoa.'},{title:'Vito Osteria',location:'Lagoa da Conceição',desc:'Massas italianas e vinhos em ambiente sofisticado.'}],nightlife:[{title:'John Bull Pub',location:'Av. das Rendeiras, Lagoa',desc:'Pub com cervejas artesanais e música ao vivo.'},{title:'Barzin da Lagoa',location:'Lagoa da Conceição',desc:'Bar descontraído à beira da lagoa.'},{title:'Calçadão da Beiramar',location:'Av. Beiramar Norte',desc:'Food trucks, bares e vista para o mar.'},{title:'Bar do Arante',location:'Pântano do Sul',desc:'Bar histórico e boêmio com bilhetes nas paredes.'}]}
+};
+
+function getDestMock(dest) {
+  var d=(dest||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  for (var key in DEST_DB) {
+    var entry=DEST_DB[key];
+    for (var i=0;i<entry.keys.length;i++) {
+      var k=entry.keys[i].normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      if (d.indexOf(k)!==-1) return entry;
+    }
+  }
+  return null;
+}
+
+/* ══ MOCK GENERATION ════════════════════════════════════════════ */
+function generateMockData(dest, dateStart, dateEnd, numDays, styles) {
+  var city = dest.split(',')[0].trim();
+  var flag = getFlag(dest);
+  var start = new Date(dateStart+'T00:00:00');
+  var budgetAmount = budgetEnabled ? (parseInt(_$('wiz-budget-amount').value)||0) : 0;
+  var budgetCur = _$('wiz-budget-currency').value||'BRL';
+  var dailyBudget = budgetAmount>0 ? Math.floor(budgetAmount/numDays) : 0;
+  var hotelPerNight = budgetAmount>0 ? Math.min(Math.floor(dailyBudget*.35),500) : 300;
+  function sc(b){ if(budgetAmount<=0)return b; var ab=dailyBudget-hotelPerNight; var sf=ab>0?Math.min(ab/350,1.5):.3; return Math.max(0,Math.round(b*sf)); }
+
+  var destData = getDestMock(dest);
+  if (destData) {
+    flag = destData.flag||flag;
+    var used={};
+    function pick(arr,k){ if(!used[k])used[k]=[]; var av=arr.filter(function(_,i){return!used[k].includes(i);}); if(!av.length){used[k]=[];av=arr;} var idx=Math.floor(Math.random()*av.length),orig=arr.indexOf(av[idx]); used[k].push(orig); return JSON.parse(JSON.stringify(av[idx])); }
+    var dtitles=['Chegada e Primeiros Passos','Explorando o Coração','Sabores e Cultura','Natureza e Encantos','Dia de Aventuras','De Volta ao Básico','Último Dia — Despedida'];
+    var days=[];
+    for(var i=0;i<numDays;i++){
+      var cd=new Date(start);cd.setDate(start.getDate()+i);
+      var cf1=pick(destData.cafes,'c1'),ma=pick(destData.morningAttractions,'ma'),ln=pick(destData.lunches,'ln'),aa=pick(destData.afternoonAttractions,'aa'),cf2=pick(destData.afternoonCafes,'c2'),su=pick(destData.sunsets,'su'),di=pick(destData.dinners,'di'),ni=pick(destData.nightlife,'ni');
+      days.push({date:cd.toISOString().split('T')[0],title:(i===numDays-1&&numDays>1?'Último Dia — Até Logo!':dtitles[Math.min(i,dtitles.length-1)])+' em '+city,events:[
+        {time:'08:00',title:cf1.title,desc:cf1.desc,type:'cafe',cost:30,location:cf1.location},
+        {time:'10:00',title:ma.title,desc:ma.desc,type:'sight',cost:20,location:ma.location},
+        {time:'12:30',title:ln.title,desc:ln.desc,type:'food',cost:65,location:ln.location},
+        {time:'14:30',title:aa.title,desc:aa.desc,type:'sight',cost:35,location:aa.location},
+        {time:'16:30',title:cf2.title,desc:cf2.desc,type:'cafe',cost:25,location:cf2.location},
+        {time:'17:30',title:su.title,desc:su.desc,type:'sight',cost:0,location:su.location},
+        {time:'19:30',title:di.title,desc:di.desc,type:'food',cost:90,location:di.location},
+        {time:'21:00',title:ni.title,desc:ni.desc,type:'bar',cost:40,location:ni.location}
+      ]});
+    }
+    var totalCost=days.reduce(function(s,d){return s+d.events.reduce(function(a,e){return a+(e.cost||0);},0);},0);
+    return {tripName:city+' — Roteiro',country:'Brasil',flag:destData.flag,color:destData.color,totalCost:totalCost,budgetCurrency:'BRL',_styles:styles||[],cities:[{name:city,color:destData.color,hotel:{name:'Hotel Boutique '+city,area:'Centro',nights:numDays,link:'https://www.booking.com/searchresults.html?ss='+encodeURIComponent(city),cost:numDays*350},days:days}],checklist:['📄 Documentos','✈️ Passagens','🏨 Reserva hotel','💰 Dinheiro','📱 Carregadores','🧥 Roupas','📷 Câmera'],mapStops:[{name:city,lat:destData.lat,lng:destData.lng}]};
+  }
+
+  /* Generic fallback pools */
+  var bkfs=[{time:'08:00',title:'Padaria & Café Local',desc:'Pão fresco, café coado e frutas.',type:'cafe',cost:sc(25)},{time:'08:30',title:'Mercado Municipal — Café',desc:'Sucos naturais e tapioca no mercado.',type:'cafe',cost:sc(30)},{time:'09:00',title:'Café Colonial na Praça',desc:'Buffet típico com geleias e queijos.',type:'cafe',cost:sc(40)},{time:'08:00',title:'Confeitaria Tradicional',desc:'Croissants, brioches e espresso.',type:'cafe',cost:sc(35)}];
+  var mAtt=[{time:'10:00',title:'Museu de História Regional',desc:'Acervo com peças originais da cidade.',type:'sight',cost:sc(20)},{time:'10:00',title:'Centro Histórico — Walking Tour',desc:'Ruas coloniais, igrejas e praças.',type:'sight',cost:0},{time:'10:00',title:'Catedral Central',desc:'Arquitetura imponente com visita guiada.',type:'sight',cost:sc(15)},{time:'10:00',title:'Jardim Botânico',desc:'Flora nativa e trilhas tranquilas.',type:'sight',cost:sc(10)}];
+  var lnch=[{time:'12:30',title:'Restaurante Regional',desc:'Prato típico com ingredientes locais.',type:'food',cost:sc(55)},{time:'13:00',title:'Mercado Gastronômico',desc:'Várias opções: frutos do mar, carnes.',type:'food',cost:sc(50)},{time:'12:30',title:'Trattoria da Esquina',desc:'Executivo com entrada, prato e sobremesa.',type:'food',cost:sc(60)},{time:'13:00',title:'Restaurante à Beira do Rio',desc:'Vista privilegiada com frutos do mar.',type:'food',cost:sc(70)}];
+  var aAtt=[{time:'14:30',title:'Galeria de Arte Contemporânea',desc:'Exposições de artistas locais.',type:'sight',cost:sc(15)},{time:'14:30',title:'Bairro Boêmio e Artístico',desc:'Graffiti, ateliês abertos e lojas independentes.',type:'sight',cost:0},{time:'14:30',title:'Mercado de Artesanato',desc:'Produtos feitos à mão e souvenirs únicos.',type:'sight',cost:sc(10)},{time:'14:30',title:'Ruínas ou Sítio Histórico',desc:'Patrimônio com trilhas e interpretação.',type:'sight',cost:sc(20)}];
+  var aCf=[{time:'16:30',title:'Sorveteria Artesanal',desc:'Sabores regionais com ingredientes locais.',type:'cafe',cost:sc(20)},{time:'16:30',title:'Café com Vista Panorâmica',desc:'Terraço com vista fotogênica.',type:'cafe',cost:sc(25)},{time:'16:30',title:'Chocolateria & Confeitaria',desc:'Bombons artesanais e cafés especiais.',type:'cafe',cost:sc(30)},{time:'16:30',title:'Casa de Chá Histórica',desc:'Ambiente retrô com chás raros.',type:'cafe',cost:sc(22)}];
+  var sun=[{time:'17:30',title:'Mirante Central — Pôr do Sol',desc:'Melhor vista da cidade.',type:'sight',cost:0},{time:'17:30',title:'Praia — Hora Dourada',desc:'Luz do fim de tarde deslumbrante.',type:'sight',cost:0},{time:'17:30',title:'Torre de Observação',desc:'Vista 360° sobre telhados.',type:'sight',cost:sc(15)},{time:'17:30',title:'Jardim Elevado',desc:'Parque no alto com flores e horizonte.',type:'sight',cost:0}];
+  var din=[{time:'19:30',title:'Restaurante Gastronômico',desc:'Menu degustação com vinho regional.',type:'food',cost:sc(120)},{time:'20:00',title:'Cantina Italiana',desc:'Massa artesanal e tiramisu.',type:'food',cost:sc(80)},{time:'19:30',title:'Frutos do Mar',desc:'Pescado fresco do dia.',type:'food',cost:sc(100)},{time:'20:00',title:'Churrascaria Tradicional',desc:'Carnes nobres grelhadas.',type:'food',cost:sc(90)}];
+  var nit=[{time:'21:00',title:'Praça Animada',desc:'Músicos de rua, food trucks.',type:'bar',cost:sc(30)},{time:'21:30',title:'Bar de Jazz ao Vivo',desc:'Drinks artesanais com música.',type:'bar',cost:sc(60)},{time:'21:00',title:'Mercado Noturno',desc:'Barracas de comida e artesanato.',type:'bar',cost:sc(25)},{time:'22:00',title:'Rooftop Bar',desc:'Coquetéis com skyline ao fundo.',type:'bar',cost:sc(80)}];
+  var dtitles=['Chegada em '+city,'Centro Histórico de '+city,'Cultura e Gastronomia','Bairros e Vida Local','Arte, Mercados e Sabores','Natureza e Mirantes','Imersão Cultural','Último Dia — Golden Hour'];
+  var used2={};
+  function pick2(arr,k){ if(!used2[k])used2[k]=[]; var av=arr.filter(function(_,i){return!used2[k].includes(i);}); if(!av.length){used2[k]=[];av=arr;} var idx=Math.floor(Math.random()*av.length),orig=arr.indexOf(av[idx]); used2[k].push(orig); return JSON.parse(JSON.stringify(av[idx])); }
+  var days2=[]; var runTotal=0;
+  for(var i=0;i<numDays;i++){
+    var cd=new Date(start);cd.setDate(start.getDate()+i);
+    var ev=[pick2(bkfs,'b'),pick2(mAtt,'m'),pick2(lnch,'l'),pick2(aAtt,'a'),pick2(aCf,'c'),pick2(sun,'s'),pick2(din,'d'),pick2(nit,'n')];
+    runTotal+=ev.reduce(function(s,e){return s+(e.cost||0);},0)+hotelPerNight;
+    days2.push({date:cd.toISOString().split('T')[0],title:(i===numDays-1&&numDays>1?'Último Dia — Despedida':dtitles[Math.min(i,dtitles.length-1)]),events:ev});
+  }
+  return {tripName:city+' - Roteiro',country:city,flag:flag,color:'#C4622D',totalCost:budgetAmount>0?Math.min(runTotal,budgetAmount):runTotal,budgetCurrency:budgetCur,budgetLimit:budgetAmount>0?budgetAmount:null,_styles:styles||[],cities:[{name:city,color:'#C4622D',hotel:{name:'Hotel Central '+city,area:'Centro',nights:numDays,link:'https://www.booking.com/searchresults.html?ss='+encodeURIComponent(city),cost:numDays*hotelPerNight},days:days2}],checklist:['📄 Documentos','✈️ Passagens','🏨 Reserva hotel','💰 Dinheiro','📱 Carregadores','🧴 Protetor solar','💊 Remédios','👕 Roupas','📷 Câmera','🔌 Adaptador'],mapStops:[{name:city,lat:-22.9,lng:-43.2}]};
+}
+
+/* ══ AI GENERATION ══════════════════════════════════════════════ */
+function extractText(content){ return (content||[]).filter(function(c){return c.type==='text';}).map(function(c){return c.text||'';}).join(''); }
+function parseAIJson(raw){ var clean=raw.replace(/```json\s*|\s*```/g,'').trim(); var m=clean.match(/\{[\s\S]*\}/); if(m)clean=m[0]; try{return JSON.parse(clean);}catch(e){try{return JSON.parse(repairJSON(clean));}catch(e2){return null;}} }
+function repairJSON(str){ str=str.replace(/,\s*$/,''); var ob=0,oq=0,inS=false,esc=false; for(var i=0;i<str.length;i++){var c=str[i];if(esc){esc=false;continue;}if(c==='\\'){esc=true;continue;}if(c==='"'){inS=!inS;continue;}if(inS)continue;if(c==='{')ob++;if(c==='}')ob--;if(c==='[')oq++;if(c===']')oq--;} if(inS)str+='"'; for(var i=0;i<oq;i++)str+=']'; for(var i=0;i<ob;i++)str+='}'; return str; }
+function setGenStep(idx){ ['gen-s0','gen-s1','gen-s2','gen-s3','gen-s4'].forEach(function(id,i){ var el=_$(id); if(!el)return; el.className='gen-step'+(i<idx?' done':i===idx?' active':''); }); }
+async function callAI(prompt){ var r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:4000,tools:[{"type":"web_search_20250305","name":"web_search"}],messages:[{role:"user",content:prompt}]})}); if(!r.ok)return null; var data=await r.json(); return parseAIJson(extractText(data.content)); }
+function fixEventTypes(events){ return (events||[]).map(function(ev){ var h=parseInt((ev.time||'0').split(':')[0]); var e=Object.assign({},ev); if(h>=7&&h<=9&&e.type==='food')e.type='cafe'; if(h>=11&&h<=14&&e.type==='cafe')e.type='food'; if(h>=18&&h<=20&&e.type==='cafe')e.type='food'; if(h>=21&&e.type==='food')e.type='bar'; return e; }); }
+
+async function generateTrip() {
+  if (wizDestinations.length === 0) { alert('Adicione pelo menos um destino.'); return; }
+  var dateStart=_$('wiz-date-start').value, dateEnd=_$('wiz-date-end').value;
+  var styles=[].slice.call(document.querySelectorAll('#wiz-style-chips .wiz-chip.selected')).map(function(c){return c.dataset.style;});
+  var notes=_$('wiz-notes').value.trim();
+  if(!dateStart||!dateEnd){alert('Preencha as datas.');return;}
+  var d1=new Date(dateStart+'T00:00:00'),d2=new Date(dateEnd+'T00:00:00');
+  var totalDays=Math.max(1,Math.round((d2-d1)/86400000)+1);
+
+  // Calculate days per destination
+  var dests = wizDestinations.map(function(d) { return { name:d.name, flag:d.flag, type:d.type, days:d.days }; });
+  var fixedDays = 0, autoCount = 0;
+  dests.forEach(function(d) { if (d.days === 'auto') autoCount++; else fixedDays += d.days; });
+  var remaining = Math.max(0, totalDays - fixedDays);
+  var autoPerDest = autoCount > 0 ? Math.max(1, Math.floor(remaining / autoCount)) : 0;
+  var autoExtra = autoCount > 0 ? remaining - autoPerDest * autoCount : 0;
+  dests.forEach(function(d, i) {
+    if (d.days === 'auto') {
+      d.days = autoPerDest + (i < autoExtra ? 1 : 0);
+      if (d.days < 1) d.days = 1;
+    }
+  });
+
+  var dest = dests.map(function(d){return d.name;}).join(', ');
+  hideAll(); _$('generating').classList.add('active');
+  _$('gen-dest-text').textContent=dest+' · '+totalDays+' dias'; setGenStep(0);
+  var budgetInfo=budgetEnabled?(_$('wiz-budget-amount').value?'Orçamento total: '+_$('wiz-budget-currency').value+' '+_$('wiz-budget-amount').value+'.':''):'';
+
+  var trip = null;
+  try {
+    setGenStep(0); _$('gen-dest-text').textContent='🔍 Pesquisando destinos...';
+
+    // Generate skeleton with all destinations
+    var destListStr = dests.map(function(d){return d.name+' ('+d.days+' dias)';}).join(', ');
+    var skel=await callAI('Pesquise informações reais sobre estes destinos para uma viagem: '+destListStr+'. Período: '+dateStart+' a '+dateEnd+'. Responda APENAS JSON (sem markdown): {"tripName":"string título bonito da viagem","country":"string","flag":"emoji bandeira principal","color":"hex cor","budgetCurrency":"BRL","totalCost":0,"destinations":[{"name":"nome destino","flag":"emoji","color":"hex","lat":0.0,"lng":0.0,"hotel":{"name":"hotel real","area":"bairro","nights":N,"link":"https://www.booking.com/searchresults.html?ss=DESTINO","cost":0}}],"checklist":["📄 Documentos","✈️ Passagens","🏨 Hotel"]}');
+    if(!skel)throw new Error('skeleton failed');
+
+    var cities = [];
+    var usedPlaces = [];
+    var dayOffset = 0;
+
+    for (var di = 0; di < dests.length; di++) {
+      var curDest = dests[di];
+      var skelDest = (skel.destinations && skel.destinations[di]) || {};
+      var cityDays = [];
+
+      for (var dayIdx = 0; dayIdx < curDest.days; dayIdx++) {
+        setGenStep(Math.min(1 + Math.floor((dayOffset + dayIdx) / Math.max(1, totalDays) * 3), 3));
+        _$('gen-dest-text').textContent='📅 ' + curDest.name + ' — dia ' + (dayIdx+1) + ' de ' + curDest.days + '...';
+
+        var dayDate = new Date(d1);
+        dayDate.setDate(d1.getDate() + dayOffset + dayIdx);
+        var dateStr = dayDate.toISOString().split('T')[0];
+        var isFirst = dayIdx === 0;
+        var isLast = dayIdx === curDest.days - 1 && curDest.days > 1;
+        var dayTitle = isFirst ? 'Chegada em ' + curDest.name : isLast ? 'Último dia em ' + curDest.name : 'Explorando ' + curDest.name;
+
+        var usedBlock = usedPlaces.length > 0 ? '\nLUGARES JÁ USADOS (PROIBIDO repetir):\n' + usedPlaces.map(function(p,i){return(i+1)+'. '+p;}).join('\n') : '';
+        var dayResult = await callAI(
+          'Crie o DIA ' + (dayIdx+1) + ' de ' + curDest.days + ' em ' + curDest.name + '.\n'
+          + 'Data: ' + dateStr + ' | Viajantes: ' + travelers + ' | Estilos: ' + (styles.length ? styles.join(', ') : 'variado')
+          + (notes ? ' | Obs: ' + notes : '') + (budgetInfo ? ' | ' + budgetInfo : '') + usedBlock
+          + '\n\nIMPORTANTE: Use web search para encontrar restaurantes REAIS, cafés REAIS, atrações REAIS e bares REAIS que existem em ' + curDest.name + '.'
+          + '\nPesquise "melhores restaurantes ' + curDest.name + '", "atrações turísticas ' + curDest.name + '", "cafés ' + curDest.name + '", "vida noturna ' + curDest.name + '".'
+          + '\n\nEstrutura obrigatória — 8 eventos reais:\n1. 08:00 cafe  2. 10:00 sight  3. 12:30 food  4. 14:30 sight  5. 16:30 cafe  6. 17:30 sight  7. 19:30 food  8. 21:00 bar'
+          + '\n\nResponda APENAS JSON:\n{"date":"' + dateStr + '","title":"' + dayTitle + '","events":[{"time":"08:00","title":"Nome Real","desc":"dica real","type":"cafe","cost":0,"location":"endereço real"},...]}');
+
+        if (dayResult && dayResult.events && dayResult.events.length) {
+          dayResult.events = fixEventTypes(dayResult.events);
+          dayResult.events.forEach(function(ev) { if (ev.title) usedPlaces.push(ev.title); });
+          cityDays.push(dayResult);
+        } else {
+          // Fallback: try mock data or generic
+          var mock = generateMockData(curDest.name, dateStr, dateStr, 1, styles);
+          var fd = mock.cities[0].days[0]; fd.date = dateStr; fd.title = dayTitle;
+          cityDays.push(fd);
+          fd.events.forEach(function(ev) { if (ev.title) usedPlaces.push(ev.title); });
+        }
+      }
+      dayOffset += curDest.days;
+
+      cities.push({
+        name: curDest.name,
+        color: skelDest.color || '#C4622D',
+        hotel: skelDest.hotel || { name:'Hotel ' + curDest.name, area:'Centro', nights:curDest.days, link:'https://www.booking.com/searchresults.html?ss=' + encodeURIComponent(curDest.name), cost:curDest.days*300 },
+        days: cityDays
+      });
+    }
+
+    setGenStep(4); _$('gen-dest-text').textContent='✨ Finalizando roteiro...';
+    var totalCost = cities.reduce(function(s, c) {
+      return s + c.days.reduce(function(s2, d) {
+        return s2 + (d.events || []).reduce(function(a, e) { return a + (e.cost || 0); }, 0);
+      }, 0) + (c.hotel && c.hotel.cost ? c.hotel.cost : 0);
+    }, 0);
+
+    var mapStops = dests.map(function(d, i) {
+      var sk = (skel.destinations && skel.destinations[i]) || {};
+      return { name: d.name, lat: sk.lat || 0, lng: sk.lng || 0 };
+    });
+
+    trip = {
+      tripName: skel.tripName || dest,
+      country: skel.country || dest,
+      flag: skel.flag || (dests[0] && dests[0].flag) || '✈️',
+      color: skel.color || '#C4622D',
+      totalCost: totalCost,
+      budgetCurrency: 'BRL',
+      cities: cities,
+      checklist: skel.checklist || ['📄 Documentos','✈️ Passagens','🏨 Hotel'],
+      mapStops: mapStops
+    };
+  } catch(e) { console.log('AI error, usando mock:', e.message); }
+
+  if (!trip) {
+    // Fallback to mock for first destination
+    var firstDest = dests[0] ? dests[0].name : 'Destino';
+    trip = generateMockData(firstDest, dateStart, dateEnd, totalDays, styles);
+  }
+  if (!trip.flag) trip.flag = getFlag(dest);
+  trip._styles = styles;
+
+  var tripId = editingTripId || ('trip_' + Date.now());
+  await PS.save(tripKey(tripId, 'data'), trip);
+  await PS.save(tripKey(tripId, 'checks'), {});
+  await PS.save(tripKey(tripId, 'deleted'), []);
+  await PS.save(tripKey(tripId, 'checklist'), (trip.checklist || []).map(function(t, i) { return { id:'cl_' + i, text:t, packed:false }; }));
+  var idx = await loadIndex();
+  var allD = trip.cities.reduce(function(a, c) { return a.concat(c.days.map(function(d) { return d.date; })); }, []).sort();
+  var entry = { id:tripId, name:trip.tripName, flag:trip.flag, color:trip.color || '#C4622D', dateStart:allD[0] || dateStart, dateEnd:allD[allD.length-1] || dateEnd, created:Date.now() };
+  var existIdx = idx.findIndex(function(x) { return x.id === tripId; });
+  if (existIdx !== -1) idx[existIdx] = entry; else idx.unshift(entry);
+  await saveIndex(idx);
+  activeTripId = tripId; editingTripId = null;
+  baseCur = trip.budgetCurrency || 'BRL'; displayCur = baseCur;
+  setGenStep(4); ['gen-s0','gen-s1','gen-s2','gen-s3','gen-s4'].forEach(function(id) { var el = _$(id); if (el) el.className = 'gen-step done'; });
+  setTimeout(function() { _$('generating').classList.remove('active'); renderApp(trip); }, 400);
+}
+
+/* ══ RESTYLE ════════════════════════════════════════════════════ */
+async function restyleTrip() {
+  var ns=[].slice.call(document.querySelectorAll('#restyle-chips .wiz-chip.selected')).map(function(c){return c.dataset.style;});
+  if(!ns.length){alert('Selecione pelo menos um estilo.');return;}
+  editingTripId=activeTripId;
+  var trip=await PS.load(tripKey(activeTripId,'data'),null);
+  if(!trip)return;
+  // Rebuild wizDestinations from existing trip
+  wizDestinations = (trip.cities || []).map(function(c) {
+    return { name: c.name, flag: getFlag(c.name), type: 'Destino', days: c.days ? c.days.length : 'auto' };
+  });
+  renderDestList();
+  var aD=trip.cities.reduce(function(a,c){return a.concat(c.days.map(function(d){return d.date;}));},[] ).sort();
+  _$('wiz-destination').value=wizDestinations.map(function(d){return d.name;}).join(', ');
+  if(aD.length){_$('wiz-date-start').value=aD[0];_$('wiz-date-end').value=aD[aD.length-1];}
+  document.querySelectorAll('#wiz-style-chips .wiz-chip').forEach(function(c){c.classList.toggle('selected',ns.includes(c.dataset.style));});
+  generateTrip();
+}
+
+/* ══ RENDER APP ═════════════════════════════════════════════════ */
+function evIcon(ev) {
+  var type=(ev.type||'').toLowerCase(), title=(ev.title||'').toLowerCase(), h=parseInt((ev.time||'0').split(':')[0])||0;
+  if(type==='cafe') return h<11?'☕':'🍰';
+  if(type==='bar') return '🍻';
+  if(type==='food') return h<11?'🥐':h<16?'🍽️':'🍷';
+  if(type==='sight'){
+    if(/mirante|sol|vista|observ/.test(title)) return '🌅';
+    if(/museu|galeria|catedral|palácio|castle/.test(title)) return '🏛️';
+    if(/praia|lago|mar/.test(title)) return '🏖️';
+    if(/parque|jardim|botân/.test(title)) return '🌿';
+    return '📍';
+  }
+  return '📍';
+}
+function dateBadge(date, color) {
+  var d=new Date(date+'T12:00:00');
+  var mon=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  return '<div class="date-badge" style="background:'+color+'18"><div class="date-num" style="color:'+color+'">'+d.getDate()+'</div><div class="date-mon" style="color:'+color+'">'+mon[d.getMonth()]+'</div></div>';
+}
+function fmtDateRange(t) {
+  var a=t.cities.reduce(function(acc,c){return acc.concat(c.days.map(function(d){return d.date;}));},[] ).sort();
+  if(!a.length) return '';
+  var mon=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  var f=new Date(a[0]+'T12:00:00'),l=new Date(a[a.length-1]+'T12:00:00');
+  return f.getDate()+' '+mon[f.getMonth()]+' → '+l.getDate()+' '+mon[l.getMonth()];
+}
+function fmtShortDate(s) {
+  if(!s)return''; var d=new Date(s+'T12:00:00');
+  var m=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  var w=['dom','seg','ter','qua','qui','sex','sáb'];
+  return w[d.getDay()]+' '+d.getDate()+' '+m[d.getMonth()];
+}
+function countDays(t){return t.cities.reduce(function(s,c){return s+c.days.length;},0);}
+function escHTML(s){return String(s||'').replace(/[&<>"']/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];});}
+
+function renderApp(trip) {
+  hideAll();
+  _$('app').classList.add('active');
+
+  /* Header */
+  var hasBudget=trip.totalCost&&trip.totalCost>0;
+  _$('trip-header').innerHTML=
+    '<div class="trip-header-bg-text">'+escHTML(trip.flag||'')+'</div>'
+    +'<div class="trip-header-inner">'
+    +'<div class="trip-header-eyebrow">Viagem Inteligente</div>'
+    +'<div class="trip-header-title">'+escHTML(trip.tripName)+' <span style="font-size:28px">'+escHTML(trip.flag||'✈️')+'</span></div>'
+    +'<div class="trip-header-dates">'+escHTML(fmtDateRange(trip))+' · '+countDays(trip)+' dias</div>'
+    +'<div class="trip-header-progress"><div class="progress-track"><div class="progress-fill" id="pbar"></div></div><div class="progress-text" id="ptext">0/0</div></div>'
+    +(hasBudget?'<div class="budget-pill">Estimativa <strong id="budget-text" data-cost="'+trip.totalCost+'" data-cur="'+baseCur+'">'+fmtMoney(trip.totalCost,baseCur)+'</strong></div>':'')
+    +'<div class="currency-row"><label>Moeda</label><select id="cur-select">'+Object.keys(CURR).map(function(c){return'<option value="'+c+'"'+(c===displayCur?' selected':'')+'>'+CURR[c].s+' '+c+'</option>';}).join('')+'</select></div>'
+    +'</div>';
+
+  /* Map route */
+  var rn=trip.mapStops&&trip.mapStops.length>1?trip.mapStops.map(function(s){return s.name;}).join(' → '):'';
+  _$('map-route-container').innerHTML = rn
+    ? '<a class="map-route-link" href="javascript:void(0)" onclick="openRoute()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="'+(trip.color||'#C4622D')+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><div><div>Ver rota no Maps</div><div class="map-route-link-sub">'+escHTML(rn)+'</div></div></a>'
+    : '';
+
+  /* Restyle */
+  _$('restyle-container').innerHTML='<div class="restyle-row"><button class="restyle-toggle-btn" id="restyle-toggle-btn">🔄 Recriar com outro estilo</button><div class="restyle-panel" id="restyle-panel"><div class="restyle-panel-title">Escolha novos estilos</div><div class="wiz-chips" id="restyle-chips"><button class="wiz-chip" data-style="cultural">🏛 Cultural</button><button class="wiz-chip" data-style="gastro">🍽 Gastro</button><button class="wiz-chip" data-style="aventura">🥾 Aventura</button><button class="wiz-chip" data-style="relax">🧘 Relax</button><button class="wiz-chip" data-style="romantico">💕 Romântico</button><button class="wiz-chip" data-style="natureza">🌿 Natureza</button><button class="wiz-chip" data-style="luxo">✨ Luxo</button></div><button class="restyle-go-btn" onclick="restyleTrip()">✨ Recriar</button></div></div>';
+
+  /* Itinerary */
+  var cc=['#C4622D','#2D6BC4','#1D9E75','#B44D6E','#8B5CF6','#D97706'];
+  var html='';
+  trip.cities.forEach(function(city,ci){
+    var color=city.color||cc[ci%cc.length];
+    html+='<div class="city-section"><div class="city-label"><div class="city-dot" style="background:'+color+'"></div><div class="city-name-label">'+escHTML(city.name)+'</div><div class="city-divider"></div></div>';
+    city.days.forEach(function(day,di){
+      var g='c'+ci+'d'+di;
+      var preview=(day.events&&day.events.length?day.events.slice(0,2).map(function(e){return e.title;}).join(' · '):'Dia livre');
+      var hasMove=(day.events||[]).some(function(e){return ((e.title||'')+' '+(e.type||'')).toLowerCase().match(/trem|voo|desloc|chegada|saída/);});
+      html+='<div class="day-card" id="day-'+g+'" data-day-id="'+g+'" data-city="'+escHTML(city.name)+'" data-color="'+color+'">'
+        +'<div class="day-header" onclick="toggleDay(\''+g+'\')">'
+        +dateBadge(day.date,color)
+        +'<div class="day-main">'
+        +'<div class="day-title">'+escHTML(day.title)+'</div>'
+        +'<div class="day-preview">'+escHTML(preview)+'</div>'
+        +'<div class="day-tags">'+(city.hotel?'<span class="tag tag-hotel">🏨 Hotel</span>':'')+(hasMove?'<span class="tag tag-move">↔ Deslocamento</span>':'')+'<span class="tag tag-count">'+((day.events?day.events.length:0)+' atividades')+'</span></div>'
+        +'</div>'
+        +'<div class="day-chevron">›</div>'
+        +'</div>'
+        +'<div class="events-panel" id="ep-'+g+'">';
+      (day.events||[]).forEach(function(ev,ei){
+        var eid=g+'e'+ei;
+        var mUrl='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((ev.title||'')+' '+(city.name||''));
+        html+='<div class="event-row" id="ev-'+eid+'" draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event)" ondragend="dragEnd(event)">'
+          +'<span class="drag-handle" title="Arrastar">⠿</span>'
+          +'<div class="ev-timeline"><div class="ev-dot" style="background:'+color+'"></div><div class="ev-line"></div></div>'
+          +'<div class="event-content">'
+          +'<div class="event-time">'+escHTML(ev.time||'')+'</div>'
+          +'<div class="event-title">'+evIcon(ev)+' '+escHTML(ev.title)+'</div>'
+          +(ev.desc?'<div class="event-desc">'+escHTML(ev.desc)+'</div>':'')
+          +(ev.location?'<div class="event-location">📍 '+escHTML(ev.location)+'</div>':'')
+          +(ev.cost?'<div class="event-cost" data-cost="'+ev.cost+'" data-cur="'+baseCur+'">'+fmtMoney(convCost(ev.cost,baseCur,displayCur),displayCur)+'</div>':'')
+          +'<div class="event-pills"><a class="pill pill-maps" href="'+mUrl+'" target="_blank" onclick="event.stopPropagation()">🗺 Maps</a><button class="pill pill-check" data-key="'+eid+'" onclick="event.stopPropagation();toggleCheck(this)">✓ feito</button></div>'
+          +'</div>'
+          +'<button class="btn-remove" onclick="event.stopPropagation();removeItem(\''+eid+'\')" title="Remover">×</button>'
+          +'</div>';
+      });
+      html+='<div class="add-row" id="add-'+g+'">'
+        +'<button class="add-toggle-btn" onclick="openAddRow(\''+g+'\')">+ Adicionar atividade</button>'
+        +'<div class="add-form">'
+        +'<input class="add-field" id="add-name-'+g+'" placeholder="Nome da atividade…">'
+        +'<div class="add-form-row">'
+        +'<input class="add-field" id="add-time-'+g+'" type="time" placeholder="Horário" style="flex:0 0 100px">'
+        +'<input class="add-field" id="add-loc-'+g+'" placeholder="Local / endereço">'
+        +'</div>'
+        +'<button class="add-ai-btn" onclick="showAISugg(\''+g+'\')">✨ Sugerir com IA</button>'
+        +'<div class="ai-cards" id="ai-'+g+'"></div>'
+        +'<div class="add-form-row" style="justify-content:flex-end">'
+        +'<button class="add-cancel-btn" onclick="closeAddRow(\''+g+'\')">Cancelar</button>'
+        +'<button class="add-save-btn" onclick="confirmAdd(\''+g+'\')">Salvar</button>'
+        +'</div>'
+        +'</div></div>';
+      html+='</div></div>';
+    });
+    html+='</div>';
+  });
+  _$('itinerary-body').innerHTML=html;
+
+  /* Hotels */
+  var hh='';
+  trip.cities.forEach(function(city,ci){
+    if(!city.hotel)return;
+    var color=city.color||cc[ci%cc.length];
+    hh+='<div class="hotel-card"><div class="hotel-strip" style="background:'+color+'">'+escHTML(city.name)+'</div><div class="hotel-body"><div class="hotel-name">'+escHTML(city.hotel.name)+'</div><div class="hotel-meta">'+escHTML(city.hotel.area||'')+' · '+(city.hotel.nights||'?')+' noite'+(city.hotel.nights!==1?'s':'')+'</div>'+(city.hotel.cost?'<div class="hotel-cost" data-cost="'+city.hotel.cost+'" data-cur="'+baseCur+'">'+fmtMoney(convCost(city.hotel.cost,baseCur,displayCur),displayCur)+'</div>':'')+'<div class="hotel-links">'+(city.hotel.link?'<a class="hotel-link" href="'+city.hotel.link+'" target="_blank">🔍 Buscar</a>':'')+'<a class="hotel-link" href="https://www.google.com/maps/search/?api=1&query='+encodeURIComponent((city.hotel.name||'')+' '+city.name)+'" target="_blank">📍 Maps</a></div></div></div>';
+  });
+  _$('hotels-list').innerHTML=hh||'<p style="color:var(--ink-muted);font-size:14px;padding:1rem">Nenhum hotel cadastrado.</p>';
+
+  /* Reset to itinerary page */
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  _$('page-itinerary').classList.add('active');
+  document.querySelector('.nav-item[data-page="itinerary"]').classList.add('active');
+  loadState();
+}
+
+function switchCurrency(cur) {
+  displayCur=cur;
+  document.querySelectorAll('[data-cost]').forEach(function(el){
+    el.textContent=fmtMoney(convCost(parseInt(el.dataset.cost),el.dataset.cur||baseCur,cur),cur);
+  });
+}
+
+/* ══ STATE ══════════════════════════════════════════════════════ */
+var checkState={}, deletedItems=new Set(), checklistItems=[], customItems={};
+async function loadState() {
+  if(!activeTripId) return;
+  checkState=await PS.load(tripKey(activeTripId,'checks'),{});
+  var del=await PS.load(tripKey(activeTripId,'deleted'),[]);
+  deletedItems=new Set(del);
+  checklistItems=await PS.load(tripKey(activeTripId,'checklist'),[]);
+  customItems=await PS.load(tripKey(activeTripId,'custom'),{});
+  renderCustomItems();
+  Object.entries(checkState).forEach(function(entry){
+    if(entry[1]){var btn=document.querySelector('[data-key="'+entry[0]+'"]');if(btn){btn.classList.add('done');var row=btn.closest('.event-row');if(row)row.classList.add('done');}}
+  });
+  deletedItems.forEach(function(id){var r=_$('ev-'+id);if(r)r.classList.add('deleted-hidden');});
+  renderChecklist(); updateProgress();
+}
+function renderCustomItems() {
+  Object.keys(customItems).forEach(function(dayId){
+    var panel=document.getElementById('ep-'+dayId);
+    if(!panel)return;
+    (customItems[dayId]||[]).forEach(function(ev){
+      if(!ev||!ev.id||_$('ev-'+ev.id))return;
+      var color=(_$('day-'+dayId)||{dataset:{}}).dataset.color||'var(--gold)';
+      var q=encodeURIComponent((ev.title||'')+' '+(ev.location||''));
+      var loc=ev.location?'<div class="event-location">📍 '+escHTML(ev.location)+'</div>':'';
+      var html='<div class="event-row custom-event-row" id="ev-'+ev.id+'" draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="dropItem(event)" ondragend="dragEnd(event)">'
+        +'<span class="drag-handle">⠿</span>'
+        +'<div class="ev-timeline"><div class="ev-dot" style="background:'+color+'"></div><div class="ev-line"></div></div>'
+        +'<div class="event-content"><div class="event-time">'+escHTML(ev.time||'–')+'</div>'
+        +'<div class="event-title">'+escHTML(ev.title||'')+'</div>'
+        +(ev.desc?'<div class="event-desc">'+escHTML(ev.desc)+'</div>':'')+loc
+        +'<div class="event-pills"><a class="pill pill-maps" href="https://www.google.com/maps/search/?api=1&query='+q+'" target="_blank" onclick="event.stopPropagation()">🗺 Maps</a><button class="pill pill-check" data-key="'+ev.id+'" onclick="event.stopPropagation();toggleCheck(this)">✓ feito</button></div>'
+        +'</div><button class="btn-remove" onclick="event.stopPropagation();removeItem(\''+ev.id+'\')" title="Remover">×</button></div>';
+      panel.insertAdjacentHTML('afterbegin',html);
+    });
+  });
+}
+function addCustomEvent(dayId, ev) {
+  if(!customItems[dayId])customItems[dayId]=[];
+  customItems[dayId].push(ev);
+  if(activeTripId) PS.save(tripKey(activeTripId,'custom'),customItems);
+  renderCustomItems();
+  updateProgress();
+}
+function toggleCheck(btn) {
+  var k=btn.dataset.key,d=btn.classList.toggle('done');
+  checkState[k]=d;
+  var row=btn.closest('.event-row');if(row)row.classList.toggle('done',d);
+  if(activeTripId) PS.save(tripKey(activeTripId,'checks'),checkState);
+  updateProgress();
+}
+function removeItem(id) {
+  var r=_$('ev-'+id); if(r)r.classList.add('deleted-hidden');
+  Object.keys(customItems).forEach(function(dayId){ customItems[dayId]=(customItems[dayId]||[]).filter(function(ev){return ev.id!==id;}); });
+  if(activeTripId){PS.save(tripKey(activeTripId,'custom'),customItems);}
+  deletedItems.add(id);
+  if(activeTripId) PS.save(tripKey(activeTripId,'deleted'),Array.from(deletedItems));
+  updateProgress();
+}
+function updateProgress() {
+  var all=document.querySelectorAll('.pill-check'),t=0,d=0;
+  all.forEach(function(b){var r=b.closest('.event-row');if(r&&r.classList.contains('deleted-hidden'))return;t++;if(b.classList.contains('done'))d++;});
+  var pb=_$('pbar'),pt=_$('ptext');
+  if(pb)pb.style.width=t>0?(d/t*100)+'%':'0%';
+  if(pt)pt.textContent=d+'/'+t;
+}
+
+/* ══ ADD ITEM ═══════════════════════════════════════════════════ */
+function openAddRow(id) { var r=_$('add-'+id); r.classList.add('open'); _$('add-name-'+id).focus(); }
+function closeAddRow(id) { var r=_$('add-'+id); r.classList.remove('open'); _$('ai-'+id).classList.remove('open'); _$('ai-'+id).innerHTML=''; }
+function confirmAdd(id) {
+  var name=_$('add-name-'+id).value.trim();
+  if(!name)return;
+  var time=_$('add-time-'+id).value||'';
+  var loc=_$('add-loc-'+id).value.trim();
+  var ev={id:id+'e_c_'+Date.now(),title:name,time:time||undefined,location:loc||undefined,desc:''};
+  addCustomEvent(id,ev); closeAddRow(id);
+  _$('add-name-'+id).value=''; _$('add-time-'+id).value=''; _$('add-loc-'+id).value='';
+}
+function showAISugg(dayId) {
+  var box=_$('ai-'+dayId);
+  if(box.classList.contains('open')){box.classList.remove('open');box.innerHTML='';return;}
+  var city=(_$('day-'+dayId)||{dataset:{}}).dataset.city||'cidade';
+  var pools=[
+    {title:'Pausa gastronômica local',desc:'Sugestão entre atrações sem grande deslocamento.',type:'food'},
+    {title:'Mirante ou praça próxima',desc:'Boa opção para fotos e descanso.',type:'sight'},
+    {title:'Experiência cultural rápida',desc:'Museu pequeno ou galeria perto dos pontos planejados.',type:'sight'},
+    {title:'Café especial em '+city,desc:'Parada leve para reorganizar o dia.',type:'food'},
+    {title:'Passeio a pé pelo bairro',desc:'Complemento de baixa fricção.',type:'walk'}
+  ];
+  var base=Math.abs(dayId.split('').reduce(function(a,c){return a+c.charCodeAt(0);},0));
+  var html='';
+  for(var i=0;i<3;i++){
+    var item=pools[(base+i)%pools.length];
+    var time=['10:30','12:00','15:30','17:00','19:30'][(base+i)%5];
+    html+='<div class="ai-card" onclick="pickAISugg(\''+dayId+'\',\''+encodeURIComponent(item.title)+'\',\''+time+'\',\''+encodeURIComponent(item.desc)+'\')">'
+      +'<div class="ai-card-top"><div class="ai-card-title">'+escHTML(item.title)+'</div><div class="ai-card-time">'+time+'</div></div>'
+      +'<div class="ai-card-desc">'+escHTML(item.desc)+'</div>'
+      +'<div class="ai-card-hint">Toque para adicionar</div>'
+      +'</div>';
+  }
+  box.innerHTML=html; box.classList.add('open');
+}
+function pickAISugg(dayId,titleEnc,time,descEnc){
+  var ev={id:dayId+'e_ai_'+Date.now(),title:decodeURIComponent(titleEnc),time:time,desc:decodeURIComponent(descEnc)};
+  addCustomEvent(dayId,ev); closeAddRow(dayId);
+}
+
+/* ══ DRAG & DROP ════════════════════════════════════════════════ */
+var draggedEl=null;
+function dragStart(e){draggedEl=e.target.closest('.event-row');if(draggedEl){draggedEl.classList.add('dragging');e.dataTransfer.effectAllowed='move';}}
+function dragOver(e){e.preventDefault();var t=e.target.closest('.event-row');document.querySelectorAll('.drag-over').forEach(function(el){el.classList.remove('drag-over');});if(t&&t!==draggedEl)t.classList.add('drag-over');}
+function dropItem(e){e.preventDefault();var t=e.target.closest('.event-row');if(t&&draggedEl&&t!==draggedEl){var p=t.parentNode,r=t.getBoundingClientRect();if(e.clientY<r.top+r.height/2)p.insertBefore(draggedEl,t);else p.insertBefore(draggedEl,t.nextSibling);}document.querySelectorAll('.drag-over').forEach(function(el){el.classList.remove('drag-over');});}
+function dragEnd(){if(draggedEl)draggedEl.classList.remove('dragging');draggedEl=null;}
+
+/* ══ CHECKLIST ══════════════════════════════════════════════════ */
+function renderChecklist() {
+  var c=_$('checklist-items');
+  if(!c)return;
+  c.innerHTML=checklistItems.map(function(item,i){
+    return '<div class="checklist-item'+(item.packed?' packed':'')+'"><button class="checklist-cb'+(item.packed?' checked':'')+'" data-ci="'+i+'">'+(item.packed?'✓':'')+'</button><span class="checklist-text">'+escHTML(item.text)+'</span><button class="checklist-del" data-del-ci="'+i+'">×</button></div>';
+  }).join('');
+}
+function togglePacked(i){checklistItems[i].packed=!checklistItems[i].packed;if(activeTripId)PS.save(tripKey(activeTripId,'checklist'),checklistItems);renderChecklist();}
+function deleteChecklistItem(i){checklistItems.splice(i,1);if(activeTripId)PS.save(tripKey(activeTripId,'checklist'),checklistItems);renderChecklist();}
+function addChecklistItem(){var t=prompt('Novo item:');if(!t||!t.trim())return;checklistItems.push({id:'cl_'+Date.now(),text:t.trim(),packed:false});if(activeTripId)PS.save(tripKey(activeTripId,'checklist'),checklistItems);renderChecklist();}
+
+/* ══ NAV & DAY TOGGLE ═══════════════════════════════════════════ */
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.querySelectorAll('.nav-item').forEach(function(n){n.classList.remove('active');});
+  _$('page-'+id).classList.add('active');
+  document.querySelector('.nav-item[data-page="'+id+'"]').classList.add('active');
+  window.scrollTo(0,0);
+}
+function toggleDay(id) {
+  var card=_$('day-'+id);
+  if(!card)return;
+  card.classList.toggle('open');
+}
+function openRoute() {
+  if(!activeTripId)return;
+  PS.load(tripKey(activeTripId,'data'),null).then(function(t){
+    if(!t||!t.mapStops||t.mapStops.length<2)return;
+    var s=t.mapStops,o=s[0].lat+','+s[0].lng,d=s[s.length-1].lat+','+s[s.length-1].lng;
+    var w=s.slice(1,-1).map(function(x){return x.lat+','+x.lng;}).join('|');
+    window.open('https://www.google.com/maps/dir/?api=1&origin='+o+'&destination='+d+'&waypoints='+encodeURIComponent(w)+'&travelmode=driving','_blank');
+  });
+}
+
+/* ══ EVENT DELEGATION ═══════════════════════════════════════════ */
+document.addEventListener('click', function(e) {
+  /* Trips screen */
+  var openT=e.target.closest('[data-open-trip]');
+  if(openT){openTrip(openT.dataset.openTrip);return;}
+  var editT=e.target.closest('[data-edit-trip]');
+  if(editT){e.stopPropagation();editTrip(editT.dataset.editTrip);return;}
+  var delT=e.target.closest('[data-delete-trip]');
+  if(delT){e.stopPropagation();deleteTrip(delT.dataset.deleteTripId||delT.dataset.deleteTrip);return;}
+  /* Checklist */
+  var cb=e.target.closest('[data-ci]');
+  if(cb&&cb.classList.contains('checklist-cb')){togglePacked(parseInt(cb.dataset.ci));return;}
+  var del=e.target.closest('[data-del-ci]');
+  if(del&&del.classList.contains('checklist-del')){deleteChecklistItem(parseInt(del.dataset.delCi));return;}
+  /* Currency select */
+  if(e.target.id==='cur-select'){switchCurrency(e.target.value);return;}
+  /* Restyle toggle */
+  if(e.target.id==='restyle-toggle-btn'){_$('restyle-panel').classList.toggle('open');return;}
+  /* Restyle chips */
+  var chip=e.target.closest('.wiz-chip');
+  if(chip){chip.classList.toggle('selected');return;}
+  /* Nav items */
+  var nav=e.target.closest('.nav-item[data-page]');
+  if(nav){showPage(nav.dataset.page);return;}
+  /* Back buttons */
+  if(e.target.closest('#back-btn-top')||e.target.closest('#back-btn-bottom')){backToTrips();return;}
+});
+
+/* ══ INIT ═══════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', function() {
+  /* Login events */
+  _$('login-btn').addEventListener('click', submitAuth);
+  _$('switch-mode-link').addEventListener('click', switchAuthMode);
+  _$('pw-toggle-btn').addEventListener('click', function(){
+    var p=_$('login-pw'),p2=_$('login-pw2'),b=_$('pw-toggle-btn');
+    if(p.type==='password'){p.type='text';p2.type='text';b.textContent='🔒';}
+    else{p.type='password';p2.type='password';b.textContent='👁';}
+  });
+  _$('logout-btn').addEventListener('click', logout);
+  _$('login-email').addEventListener('keydown',function(e){if(e.key==='Enter')_$('login-pw').focus();});
+  _$('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter'){if(authMode==='register')_$('login-pw2').focus();else submitAuth();}});
+  _$('login-pw2').addEventListener('keydown',function(e){if(e.key==='Enter')submitAuth();});
+
+  /* Wizard events */
+  _$('wiz-next-btn').addEventListener('click', wizNext);
+  _$('wiz-back-btn').addEventListener('click', wizBack);
+  _$('trav-minus').addEventListener('click',function(){travelers=Math.max(1,travelers-1);_$('wiz-travelers').textContent=travelers;});
+  _$('trav-plus').addEventListener('click',function(){travelers=Math.min(20,travelers+1);_$('wiz-travelers').textContent=travelers;});
+  _$('budget-no-btn').addEventListener('click',function(){budgetEnabled=false;_$('budget-no-btn').classList.add('selected');_$('budget-yes-btn').classList.remove('selected');_$('budget-fields').style.display='none';});
+  _$('budget-yes-btn').addEventListener('click',function(){budgetEnabled=true;_$('budget-yes-btn').classList.add('selected');_$('budget-no-btn').classList.remove('selected');_$('budget-fields').style.display='';});
+  document.querySelectorAll('.wiz-preset-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      budgetPreset=btn.dataset.preset;
+      document.querySelectorAll('.wiz-preset-btn').forEach(function(b){b.classList.remove('selected');});
+      btn.classList.add('selected');
+    });
+  });
+
+  /* Trips screen */
+  _$('new-trip-btn').addEventListener('click', startNewTrip);
+
+  /* Destination add button */
+  _$('dest-add-btn').addEventListener('click', addDestSlot);
+
+  /* Checklist add */
+  _$('checklist-add-btn').addEventListener('click', addChecklistItem);
+
+  /* Wizard date defaults */
+  var today=new Date(),s=new Date(today),e=new Date(today);
+  s.setDate(s.getDate()+30); e.setDate(e.getDate()+37);
+  _$('wiz-date-start').value=s.toISOString().split('T')[0];
+  _$('wiz-date-end').value=e.toISOString().split('T')[0];
+
+  goToWizStep(0);
+});
+</script>
+</body>
+</html>
